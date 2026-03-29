@@ -153,7 +153,7 @@ export default function Landing() {
           <span className="font-mono text-xs text-white/30">
             luayou -- learn lua the fun way
           </span>
-          <span className="font-mono text-xs text-white/20">2025</span>
+          <span className="font-mono text-xs text-white/20">2026</span>
         </div>
       </footer>
 
