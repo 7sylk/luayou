@@ -1,0 +1,115 @@
+{
+  "theme": "dark",
+  "archetype": "Archetype 4 (Swiss & High-Contrast) - Dark IDE/Terminal Variant",
+  "design_principles": [
+    "Fusion over Imitation: Combine high-end editorial Swiss design with pure hacker/IDE utility.",
+    "Emotion First: The feeling of deep focus, uninterrupted flow state. Tension through typography.",
+    "Zoom in: Focus on the code, remove UI clutter. Use negative space aggressively around the editor.",
+    "Contrast: Pure black vs Stark white. 1px borders, sharp edges, no soft shadows.",
+    "Color is Function: Monochrome entirely. Strict black, white, and greys. No color gradients."
+  ],
+  "typography": {
+    "fonts": {
+      "headings": "JetBrains Mono",
+      "body": "IBM Plex Sans",
+      "mono": "JetBrains Mono",
+      "fallback": "sans-serif"
+    },
+    "rules": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tighter font-black",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-bold",
+      "h3": "text-xl sm:text-2xl font-bold",
+      "body": "text-base leading-relaxed font-light",
+      "labels_overlines": "text-xs tracking-[0.2em] uppercase font-mono text-white/60",
+      "code": "font-mono text-sm leading-relaxed"
+    }
+  },
+  "colors": {
+    "background": {
+      "primary": "#050505",
+      "secondary": "#0A0A0A",
+      "tertiary": "#121212"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#A1A1AA",
+      "muted": "#71717A"
+    },
+    "border": {
+      "default": "rgba(255, 255, 255, 0.1)",
+      "focus": "#FFFFFF",
+      "active": "rgba(255, 255, 255, 0.3)"
+    },
+    "accents": {
+      "xp_badge": "#FFFFFF",
+      "ai_tutor": "#E4E4E7",
+      "success": "#FFFFFF",
+      "error": "#A1A1AA"
+    }
+  },
+  "layout_spacing": {
+    "philosophy": "Strict grid hierarchy. Generous breathing room for reading, high-density control room grid for the IDE editor.",
+    "bento_grid": "Grid borders exposed. Use border-collapse logic for feature grids.",
+    "ide_layout": "Sidebar (Lessons) | Main (Editor) | Terminal (Output). Use h-screen with flex/grid to fill all space without scrolling the main container."
+  },
+  "surfaces_and_micro_themes": {
+    "cards": "Flat background, 1px sharp border (border-white/10), absolutely zero shadow or blur. Brutalist box.",
+    "header": "Solid #050505 background, border-b border-white/10. No glassmorphism.",
+    "buttons": {
+      "primary": "bg-white text-black hover:bg-neutral-200 font-mono text-sm uppercase tracking-wide rounded-none",
+      "secondary": "bg-transparent border border-white/20 text-white hover:bg-white/10 rounded-none",
+      "ghost": "bg-transparent text-white/70 hover:text-white hover:bg-white/5 rounded-none"
+    }
+  },
+  "components": {
+    "strategy": "Shadcn components heavily customized. Strip out all border-radius (rounded-none). Remove box-shadows. Use 1px solid borders.",
+    "editor": "Monaco Editor or CodeMirror with a custom black/white theme. No syntax highlighting colors, just bold/italic/white/grey for keywords, strings, etc.",
+    "ai_tutor": "Terminal-style output. Typewriter effect for incoming text. Prefix AI messages with '> '",
+    "leaderboard": "Table format, monospaced numbers, stark borders on bottom of rows.",
+    "forms": "Use Shadcn Input, Select, Checkbox. Make inputs square (rounded-none) with border-white/20 and focus:border-white focus:ring-0."
+  },
+  "motion_and_interaction": {
+    "hover": "Instant background color change. Hard cuts, no soft transitions. It should feel like a lightning-fast terminal.",
+    "focus": "2px solid white outline. No ring offset.",
+    "loading": "ASCII art spinner or simple blinking block cursor '█'."
+  },
+  "icons": {
+    "library": "phosphor-icons/react",
+    "style": "Regular or Bold weight, strictly monochrome. Minimalist geometric.",
+    "installation": "yarn add @phosphor-icons/react"
+  },
+  "media": {
+    "images": [
+      {
+        "category": "hero_background",
+        "url": "https://images.pexels.com/photos/25626445/pexels-photo-25626445.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Abstract design showcasing computing fields with geometric and binary patterns in black and white"
+      },
+      {
+        "category": "feature_abstract_data",
+        "url": "https://images.unsplash.com/photo-1771015138249-7dbd8eab0546?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTJ8MHwxfHNlYXJjaHwxfHxibGFjayUyMGFuZCUyMHdoaXRlJTIwYWJzdHJhY3QlMjBkYXRhfGVufDB8fHx8MTc3NDc1NjM1NHww&ixlib=rb-4.1.0&q=85",
+        "description": "Abstract molecular structure with glowing nodes - black and white"
+      },
+      {
+        "category": "workspace_tech",
+        "url": "https://images.unsplash.com/photo-1768167630789-925bc3c70db7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTJ8MHwxfHNlYXJjaHwyfHxkYXJrJTIwbWluaW1hbGlzdCUyMHRlY2glMjB3b3Jrc3BhY2V8ZW58MHx8fHwxNzc0NzU2MzUzfDA&ixlib=rb-4.1.0&q=85",
+        "description": "Close-up of a dark laptop keyboard"
+      }
+    ],
+    "rules": "All images MUST be heavily desaturated (grayscale) and have high contrast applied via CSS (filter: grayscale(100%) contrast(120%)). Use low opacity overlay (bg-black/80) to ensure text readability."
+  },
+  "accessibility": {
+    "contrast": "APCA and WCAG AAA compliant. White on pure black provides extreme contrast.",
+    "testing": "All interactive elements MUST include data-testid attribute in kebab-case."
+  },
+  "instructions_to_main_agent": [
+    "Install JetBrains Mono and IBM Plex Sans via Google Fonts.",
+    "Override default Shadcn styles in tailwind.config.js to remove border radii completely.",
+    "Implement the IDE editor area to take up maximum viewport height (calc(100vh - header_height)).",
+    "Keep gamification elements (XP, level bars) subtle; use solid white blocks or patterned 1px hashes instead of colored progress bars.",
+    "Strictly follow the 'Minimal dark black and white' user choice. Avoid introducing blue/purple tech accents.",
+    "Add 'data-testid' to all buttons, links, inputs, and key UI interactions for testing.",
+    "Use Phosphor icons. Don't use standard Shadcn Radix icons. Install with `yarn add @phosphor-icons/react`.",
+    "All backgrounds should be solid. Avoid glassmorphism. Focus on sharp edges and minimal UI boundaries."
+  ]
+}
