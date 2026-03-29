@@ -1,0 +1,97 @@
+from pydantic import BaseModel
+from typing import List, Optional
+
+
+class UserCreate(BaseModel):
+    email: str
+    password: str
+    username: str
+
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    username: str
+    avatar: str = "default"
+    xp: int = 0
+    level: int = 1
+    streak: int = 0
+    badges: List[str] = []
+    lessons_completed: int = 0
+    daily_completed: int = 0
+    last_active: Optional[str] = None
+    created_at: str
+
+
+class AuthResponse(BaseModel):
+    token: str
+    user: UserResponse
+
+
+class LessonBrief(BaseModel):
+    id: str
+    title: str
+    difficulty: str
+    order_index: int
+    xp_reward: int
+    completed: bool = False
+    locked: bool = False
+
+
+class LessonFull(BaseModel):
+    id: str
+    title: str
+    difficulty: str
+    content: str
+    code_examples: str
+    challenge_description: str
+    challenge_starter_code: str
+    challenge_expected_output: str
+    order_index: int
+    xp_reward: int
+    completed: bool = False
+
+
+class QuizSubmission(BaseModel):
+    quiz_id: str
+    lesson_id: str
+    answers: List[int]
+
+
+class QuizResult(BaseModel):
+    score: int
+    total: int
+    xp_earned: int
+    results: list
+
+
+class CodeRequest(BaseModel):
+    code: str
+    lesson_id: Optional[str] = None
+
+
+class CodeResponse(BaseModel):
+    output: str
+    success: bool
+    error: Optional[str] = None
+
+
+class AiTutorRequest(BaseModel):
+    code: str
+    error_output: Optional[str] = ""
+    mode: str = "hint"
+    lesson_id: Optional[str] = None
+
+
+class AiTutorResponse(BaseModel):
+    response: str
+    mode: str
+
+
+class ProfileUpdate(BaseModel):
+    username: Optional[str] = None

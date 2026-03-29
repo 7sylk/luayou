@@ -1,34 +1,58 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* XP bar animation */
+.xp-bar {
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+/* Stagger animation */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+
+/* Cursor blink for loading */
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+.cursor-blink {
+    animation: blink 1s step-end infinite;
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+/* Code editor textarea */
+.code-editor-textarea {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    tab-size: 2;
+    resize: none;
+    outline: none;
+    background: transparent;
+    color: hsl(0 0% 90%);
+    caret-color: white;
 }
 
-.App-link {
-    color: #61dafb;
+.code-editor-textarea::placeholder {
+    color: hsl(0 0% 30%);
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+/* Terminal output */
+.terminal-output {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* Page transitions */
+.page-enter {
+    opacity: 0;
+    transform: translateY(8px);
+}
+.page-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.2s ease, transform 0.2s ease;
 }
