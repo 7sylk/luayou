@@ -4,7 +4,7 @@ from datetime import datetime
 import json
 
 class LuaYouAPITester:
-    def __init__(self, base_url="https://code-streak-7.preview.emergentagent.com"):
+    def __init__(self, base_url="http://localhost:8001"):
         self.base_url = base_url
         self.token = None
         self.user_id = None
