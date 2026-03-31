@@ -313,17 +313,15 @@ QUIZZES = []
 
 async def seed_database(db):
     existing = await db.lessons.count_documents({})
-    if existing > 0:
-        return
+    if existing == 0:
+        for lesson in LESSONS:
+            await db.lessons.insert_one({**lesson})
 
-    for lesson in LESSONS:
-        await db.lessons.insert_one({**lesson})
+        for quiz in QUIZZES:
+            await db.quizzes.insert_one({**quiz})
 
-    for quiz in QUIZZES:
-        await db.quizzes.insert_one({**quiz})
-
-    for template in DAILY_TEMPLATES:
-        await db.daily_templates.insert_one({**template})
+        for template in DAILY_TEMPLATES:
+            await db.daily_templates.insert_one({**template})
 
     # Create indexes
     await db.users.create_index("email", unique=True)
@@ -359,7 +357,13 @@ async def seed_database(db):
             "lessons_completed": 3,
             "daily_completed": 2,
             "perfect_quizzes": 1,
+            "email_verified": True,
             "last_active": datetime.now(timezone.utc).isoformat(),
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         await db.users.insert_one(admin_doc)
+    else:
+        await db.users.update_one(
+            {"email": admin_email},
+            {"$set": {"email_verified": True}},
+        )

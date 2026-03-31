@@ -16,9 +16,11 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
   const [resetToken, setResetToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showVerifyEntry, setShowVerifyEntry] = useState(false);
 
   useEffect(() => {
     setMode(defaultTab || "login");
+    setShowVerifyEntry(defaultTab === "verify");
   }, [defaultTab]);
 
   if (!open) return null;
@@ -32,7 +34,18 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
       setSession(res.data.token, res.data.user);
       close();
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Login failed");
+      const detail = e.response?.data?.detail || "Login failed";
+      if (
+        e.response?.status === 403 &&
+        typeof detail === "string" &&
+        detail.toLowerCase().includes("email not verified")
+      ) {
+        toast.error(detail);
+        setShowVerifyEntry(true);
+        setMode("verify");
+      } else {
+        toast.error(detail);
+      }
     }
     setLoading(false);
   };
@@ -42,6 +55,7 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
     try {
       await axios.post(`${API}/api/auth/register`, { email, password, username });
       toast.success("Account created. Check your email for a verification code.");
+      setShowVerifyEntry(true);
       setMode("verify");
     } catch (e) {
       toast.error(e.response?.data?.detail || "Registration failed");
@@ -55,6 +69,7 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
       await axios.post(`${API}/api/auth/verify-email`, { email, code: verificationCode });
       toast.success("Email verified. You can now sign in.");
       setMode("login");
+      setShowVerifyEntry(false);
       setVerificationCode("");
     } catch (e) {
       toast.error(e.response?.data?.detail || "Verification failed");
@@ -144,6 +159,8 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
                 className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
                 placeholder="email"
                 type="email"
+                name="login-email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 data-testid="email-input"
@@ -152,6 +169,8 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
                 className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
                 placeholder="password"
                 type="password"
+                name="login-password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 data-testid="password-input"
@@ -180,6 +199,14 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
                   Forgot password?
                 </button>
               </div>
+              {showVerifyEntry && (
+                <button
+                  className="font-mono text-xs text-white/30 hover:text-white"
+                  onClick={() => setMode("verify")}
+                >
+                  Enter verification code
+                </button>
+              )}
             </>
           )}
 
@@ -188,6 +215,9 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
               <input
                 className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
                 placeholder="username"
+                type="text"
+                name="register-username"
+                autoComplete="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 data-testid="username-input"
@@ -196,6 +226,8 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
                 className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
                 placeholder="email"
                 type="email"
+                name="register-email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 data-testid="email-input"
@@ -204,6 +236,8 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
                 className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
                 placeholder="password"
                 type="password"
+                name="register-password"
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 data-testid="password-input"
@@ -235,12 +269,17 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
                 className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
                 placeholder="email"
                 type="email"
+                name="verify-email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
               <input
                 className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
                 placeholder="verification code"
+                type="text"
+                name="verification-code"
+                autoComplete="one-time-code"
                 value={verificationCode}
                 onChange={(e) => setVerificationCode(e.target.value)}
               />
@@ -251,18 +290,20 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
               >
                 {loading ? "..." : "Verify email"}
               </Button>
-              <button
-                className="font-mono text-xs text-white/30 hover:text-white"
-                onClick={handleResendVerification}
-              >
-                Resend verification code
-              </button>
-              <button
-                className="font-mono text-xs text-white/30 hover:text-white"
-                onClick={() => setMode("login")}
-              >
-                Back to sign in
-              </button>
+              <div className="space-y-3 pt-2">
+                <button
+                  className="block w-full text-left font-mono text-xs text-white/30 hover:text-white"
+                  onClick={handleResendVerification}
+                >
+                  Resend verification code
+                </button>
+                <button
+                  className="block w-full text-left font-mono text-xs text-white/30 hover:text-white"
+                  onClick={() => setMode("login")}
+                >
+                  Back to sign in
+                </button>
+              </div>
             </>
           )}
 
@@ -275,6 +316,8 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
                 className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
                 placeholder="email"
                 type="email"
+                name="forgot-email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -302,6 +345,9 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
               <input
                 className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
                 placeholder="reset code"
+                type="text"
+                name="reset-code"
+                autoComplete="one-time-code"
                 value={resetToken}
                 onChange={(e) => setResetToken(e.target.value)}
               />
@@ -309,6 +355,8 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
                 className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
                 placeholder="new password"
                 type="password"
+                name="reset-password"
+                autoComplete="new-password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
               />

@@ -6,13 +6,17 @@ import uuid
 from datetime import datetime, timezone, timedelta
 import random
 import os
-from email_service import send_verification_code, send_password_reset_code, send_welcome_email
+from email_service import send_verification_code, send_password_reset_code, send_welcome_email, smtp_is_configured
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 def _verification_required() -> bool:
     return os.environ.get("REQUIRE_EMAIL_VERIFICATION", "true").strip().lower() in ("1", "true", "yes")
+
+
+def _verification_enforced() -> bool:
+    return _verification_required() and smtp_is_configured()
 
 
 def _make_code() -> str:
@@ -50,7 +54,7 @@ async def register(data: UserCreate):
         "lessons_completed": 0,
         "daily_completed": 0,
         "perfect_quizzes": 0,
-        "email_verified": False,
+        "email_verified": not _verification_enforced(),
         "last_active": now,
         "created_at": now,
     }
@@ -59,24 +63,27 @@ async def register(data: UserCreate):
     verify_expires = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
     try:
         await db.users.insert_one(user_doc)
-        await db.email_verifications.update_one(
-            {"email": data.email.lower()},
-            {
-                "$set": {
-                    "code": verify_code,
-                    "expires": verify_expires,
-                    "used": False,
-                    "created_at": now,
-                }
-            },
-            upsert=True,
-        )
-        send_verification_code(data.email.lower(), data.username, verify_code)
+        if _verification_enforced():
+            await db.email_verifications.update_one(
+                {"email": data.email.lower()},
+                {
+                    "$set": {
+                        "code": verify_code,
+                        "expires": verify_expires,
+                        "used": False,
+                        "created_at": now,
+                    }
+                },
+                upsert=True,
+            )
+            send_verification_code(data.email.lower(), data.username, verify_code)
     except Exception:
         await db.users.delete_one({"id": user_id})
         await db.email_verifications.delete_one({"email": data.email.lower()})
         raise HTTPException(status_code=500, detail="Unable to send verification email")
-    return {"message": "Account created. Check your email for verification code."}
+    if _verification_enforced():
+        return {"message": "Account created. Check your email for verification code."}
+    return {"message": "Account created successfully."}
 
 
 @router.post("/login", response_model=AuthResponse)
@@ -87,7 +94,7 @@ async def login(data: UserLogin):
 
     if not verify_password(data.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    if _verification_required() and not user.get("email_verified", False):
+    if _verification_enforced() and not user.get("email_verified", False):
         raise HTTPException(status_code=403, detail="Email not verified. Please verify your email first.")
 
     now = datetime.now(timezone.utc)
@@ -128,6 +135,8 @@ async def forgot_password(data: dict):
     email = data.get("email", "").lower()
     if not email:
         raise HTTPException(status_code=400, detail="Email is required")
+    if not smtp_is_configured():
+        raise HTTPException(status_code=503, detail="Password reset email is not configured")
 
     user = await db.users.find_one({"email": email}, {"_id": 0})
     # Always return success to prevent email enumeration
@@ -213,6 +222,9 @@ async def resend_verification(data: dict):
     email = data.get("email", "").lower().strip()
     if not email:
         raise HTTPException(status_code=400, detail="Email is required")
+    if not _verification_enforced():
+        await db.users.update_one({"email": email}, {"$set": {"email_verified": True}})
+        return {"message": "Email verification is currently disabled for this environment."}
     user = await db.users.find_one({"email": email}, {"_id": 0})
     if not user:
         return {"message": "If that email exists, a verification code has been sent."}

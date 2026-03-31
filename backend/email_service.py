@@ -4,6 +4,19 @@ import ssl
 from email.message import EmailMessage
 
 
+def smtp_is_configured() -> bool:
+    host = os.environ.get("SMTP_HOST", "").strip()
+    username = os.environ.get("SMTP_USERNAME", "").strip()
+    password = os.environ.get("SMTP_PASSWORD", "").strip()
+    sender = os.environ.get("SMTP_FROM_EMAIL", username).strip()
+    placeholder_passwords = {
+        "",
+        "PUT_YOUR_GMAIL_APP_PASSWORD_HERE",
+        "YOUR_GMAIL_APP_PASSWORD",
+    }
+    return bool(host and username and sender and password not in placeholder_passwords)
+
+
 def _smtp_config():
     host = os.environ.get("SMTP_HOST", "").strip()
     port = int(os.environ.get("SMTP_PORT", "587"))
@@ -16,7 +29,7 @@ def _smtp_config():
 
 def send_email(to_email: str, subject: str, body_text: str):
     host, port, username, password, sender, use_tls = _smtp_config()
-    if not host or not username or not password or not sender:
+    if not smtp_is_configured():
         raise RuntimeError("SMTP not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM_EMAIL")
 
     msg = EmailMessage()
