@@ -2,7 +2,6 @@ from fastapi import APIRouter, HTTPException, Request
 from models import UserResponse, ProfileUpdate
 from database import db
 from utils import get_current_user, xp_for_next_level, check_badges
-import base64
 
 router = APIRouter(prefix="/api/user", tags=["user"])
 
@@ -43,11 +42,9 @@ async def upload_avatar(data: dict, request: Request):
     if not avatar_data:
         raise HTTPException(status_code=400, detail="No avatar data provided")
 
-    # Accept base64 data URLs (e.g. data:image/png;base64,...)
     if not avatar_data.startswith("data:image/"):
         raise HTTPException(status_code=400, detail="Invalid image format")
 
-    # Rough size check — base64 of 500KB image ~ 680KB string
     if len(avatar_data) > 700_000:
         raise HTTPException(status_code=400, detail="Image too large. Max 500KB.")
 

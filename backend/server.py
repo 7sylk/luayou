@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 import os
@@ -16,13 +17,27 @@ from seed_data import seed_database
 from routes.auth import router as auth_router
 from routes.lessons import router as lessons_router
 from routes.quiz import router as quiz_router
-from routes.code import router as code_router
 from routes.daily import router as daily_router
 from routes.leaderboard import router as leaderboard_router
 from routes.ai_tutor import router as ai_tutor_router
 from routes.user import router as user_router
 
-app = FastAPI(title="LuaYou API")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await seed_database(db)
+    logger.info("LuaYou database seeded")
+    yield
+    client.close()
+
+
+app = FastAPI(title="LuaYou API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,26 +50,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(lessons_router)
 app.include_router(quiz_router)
-app.include_router(code_router)
 app.include_router(daily_router)
 app.include_router(leaderboard_router)
 app.include_router(ai_tutor_router)
 app.include_router(user_router)
-
-
-@app.on_event("startup")
-async def startup():
-    await seed_database(db)
-    logging.info("LuaYou database seeded")
-
-
-@app.on_event("shutdown")
-async def shutdown():
-    client.close()
-
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)

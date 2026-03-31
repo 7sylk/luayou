@@ -19,6 +19,8 @@ export default function Header() {
     navigate("/");
   };
 
+  const hasAvatar = user?.avatar && user.avatar !== "default";
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-background/95 backdrop-blur-sm" data-testid="app-header">
       <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
@@ -62,8 +64,18 @@ export default function Header() {
                 <span className="text-white/20">|</span>
                 <span>Lv.{user.level}</span>
               </button>
-              <div className="w-7 h-7 bg-white text-black flex items-center justify-center font-mono text-xs font-bold cursor-pointer" onClick={() => navigate("/profile")} data-testid="header-avatar">
-                {user.username?.charAt(0)?.toUpperCase() || "?"}
+              <div
+                className="w-7 h-7 overflow-hidden border border-white/10 flex items-center justify-center font-mono text-xs font-bold cursor-pointer"
+                onClick={() => navigate("/profile")}
+                data-testid="header-avatar"
+              >
+                {hasAvatar ? (
+                  <img src={user.avatar} alt="avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="bg-white text-black w-full h-full flex items-center justify-center">
+                    {user.username?.charAt(0)?.toUpperCase() || "?"}
+                  </span>
+                )}
               </div>
               <Button
                 variant="ghost"

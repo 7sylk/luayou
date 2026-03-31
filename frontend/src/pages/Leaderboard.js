@@ -4,6 +4,29 @@ import { leaderboardAPI } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Trophy } from "@phosphor-icons/react";
+import { Skeleton } from "@/components/Skeleton";
+
+function LeaderboardSkeleton() {
+  return (
+    <div className="max-w-3xl mx-auto px-6 pt-20 pb-12">
+      <Skeleton className="h-3 w-20 mb-3" />
+      <Skeleton className="h-10 w-48 mb-8" />
+      <div className="border border-white/10">
+        {[...Array(8)].map((_, i) => (
+          <div key={i} className="flex items-center gap-4 px-4 py-3 border-b border-white/5">
+            <Skeleton className="h-4 w-8" />
+            <Skeleton className="h-7 w-7 rounded-none" />
+            <Skeleton className="h-4 w-32" />
+            <div className="ml-auto flex gap-6">
+              <Skeleton className="h-4 w-12" />
+              <Skeleton className="h-4 w-16" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function Leaderboard() {
   const { user } = useAuth();
@@ -11,8 +34,20 @@ export default function Leaderboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    leaderboardAPI.get().then((r) => { setEntries(r.data); setLoading(false); }).catch(() => setLoading(false));
+    leaderboardAPI.get()
+      .then((r) => setEntries(r.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <LeaderboardSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background" data-testid="leaderboard-page">
@@ -25,9 +60,7 @@ export default function Leaderboard() {
           </h1>
         </div>
 
-        {loading ? (
-          <div className="font-mono text-sm text-white/30">loading<span className="cursor-blink">_</span></div>
-        ) : entries.length === 0 ? (
+        {entries.length === 0 ? (
           <div className="border border-white/10 p-8 text-center font-mono text-sm text-white/30">
             No users yet. Be the first!
           </div>
@@ -62,10 +95,14 @@ export default function Leaderboard() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <div className={`w-7 h-7 flex items-center justify-center font-mono text-xs font-bold ${
+                          <div className={`w-7 h-7 flex items-center justify-center font-mono text-xs font-bold overflow-hidden ${
                             isMe ? "bg-white text-black" : "bg-white/10 text-white/60"
                           }`}>
-                            {entry.username.charAt(0).toUpperCase()}
+                            {entry.avatar && entry.avatar !== "default" ? (
+                              <img src={entry.avatar} alt="avatar" className="w-full h-full object-cover" />
+                            ) : (
+                              entry.username.charAt(0).toUpperCase()
+                            )}
                           </div>
                           <span className={`font-mono text-sm ${isMe ? "font-bold text-white" : "text-white/70"}`}>
                             {entry.username}{isMe && " (you)"}

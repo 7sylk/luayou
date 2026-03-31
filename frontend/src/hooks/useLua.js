@@ -28,7 +28,6 @@ export function useLua() {
 
       let captured = "";
 
-      // Override print() to capture output
       lua.lua_register(L, to_luastring("print"), (L) => {
         const n = lua.lua_gettop(L);
         const parts = [];
@@ -59,12 +58,13 @@ export function useLua() {
         if (!passed) {
           setError(`Expected:\n${expectedOutput.trim()}\nGot:\n${result}`);
         }
+        setRunning(false);
+        return { output: result, error: passed ? "" : `Expected:\n${expectedOutput.trim()}\nGot:\n${result}`, success: passed };
       } else {
         setSuccess(true);
+        setRunning(false);
+        return { output: result, error: "", success: true };
       }
-
-      setRunning(false);
-      return { output: result, error: "", success: true };
 
     } catch (e) {
       const msg = e.message || "Failed to run Lua";

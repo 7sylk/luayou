@@ -31,7 +31,6 @@ export default function Profile() {
 
   useEffect(() => {
     userAPI.stats().then((r) => setStats(r.data)).catch(() => {});
-    // Load current avatar
     if (user?.avatar && user.avatar !== "default") {
       setAvatarSrc(user.avatar);
     }
@@ -57,7 +56,7 @@ export default function Profile() {
       const base64 = ev.target.result;
       setUploadingAvatar(true);
       try {
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem("luayou_token"); // fixed key
         await axios.post(
           `${API}/api/user/avatar`,
           { avatar: base64 },
@@ -94,7 +93,6 @@ export default function Profile() {
         <div className="mb-10 animate-fade-in">
           <p className="font-mono text-xs tracking-[0.2em] uppercase text-white/40 mb-2">Profile</p>
           <div className="flex items-center gap-4">
-            {/* Avatar */}
             <div className="relative group">
               <button
                 onClick={handleAvatarClick}
@@ -110,7 +108,6 @@ export default function Profile() {
                     {user?.username?.charAt(0)?.toUpperCase() || "?"}
                   </div>
                 )}
-                {/* Hover overlay */}
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <span className="font-mono text-xs text-white">
                     {uploadingAvatar ? "..." : "Edit"}
@@ -136,7 +133,6 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* Level Progress */}
         <div className="border border-white/10 p-5 mb-6 animate-fade-in stagger-1" data-testid="level-progress">
           <div className="flex justify-between items-center mb-3">
             <span className="font-mono text-xs text-white/40 uppercase tracking-wider">Level {level}</span>
@@ -147,7 +143,6 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-white/10 mb-8 animate-fade-in stagger-2" data-testid="profile-stats">
           {[
             { label: "Total XP", value: xp },
@@ -164,7 +159,6 @@ export default function Profile() {
           ))}
         </div>
 
-        {/* Badges */}
         <div className="animate-fade-in stagger-3" data-testid="badges-section">
           <h2 className="font-mono font-bold text-lg tracking-tight mb-4">Badges</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

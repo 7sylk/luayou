@@ -9,7 +9,7 @@ import { Lightning, Target, BookOpen, ArrowRight, Play, Check } from "@phosphor-
 import { toast } from "sonner";
 import { DashboardSkeleton } from "@/components/Skeleton";
 
-function DailyChallengeCard({ daily, onComplete }) {
+function DailyChallengeCard({ daily, onComplete, completing }) {
   const [code, setCode] = useState(daily.challenge_starter_code || "");
   const [expanded, setExpanded] = useState(false);
   const { runLua, output, error, success, running } = useLua();
@@ -111,14 +111,14 @@ function DailyChallengeCard({ daily, onComplete }) {
             <Button
               size="sm"
               className={`rounded-none font-mono text-xs uppercase tracking-wider h-7 px-4 ${
-                success === true
+                success === true && !completing
                   ? "bg-white text-black hover:bg-neutral-200"
                   : "bg-white/10 text-white/30 cursor-not-allowed"
               }`}
               onClick={handleComplete}
-              disabled={success !== true}
+              disabled={success !== true || completing}
             >
-              {success === true ? "Complete" : "Run first"}
+              {completing ? "..." : success === true ? "Complete" : "Run first"}
             </Button>
           </div>
         </div>
@@ -134,7 +134,7 @@ export default function Dashboard() {
   const [lessons, setLessons] = useState([]);
   const [daily, setDaily] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [loadingDaily, setLoadingDaily] = useState(false);
+  const [completing, setCompleting] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -156,7 +156,8 @@ export default function Dashboard() {
   const recentLessons = lessons.slice(0, 5);
 
   const handleCompleteDaily = useCallback(async () => {
-    setLoadingDaily(true);
+    if (completing) return;
+    setCompleting(true);
     try {
       const res = await dailyAPI.complete();
       toast.success(`+${res.data.xp_earned} XP earned!`);
@@ -173,8 +174,8 @@ export default function Dashboard() {
     } catch (e) {
       toast.error(e.response?.data?.detail || "Failed to complete");
     }
-    setLoadingDaily(false);
-  }, [refreshUser]);
+    setCompleting(false);
+  }, [refreshUser, completing]);
 
   if (loading) {
     return (
@@ -234,7 +235,12 @@ export default function Dashboard() {
               <span className="font-mono text-xs uppercase tracking-wider text-white/60">Daily Challenge</span>
             </div>
             {daily ? (
-              <DailyChallengeCard daily={daily} onComplete={handleCompleteDaily} />
+              <DailyChallengeCard
+                key={daily.date}
+                daily={daily}
+                onComplete={handleCompleteDaily}
+                completing={completing}
+              />
             ) : (
               <div className="p-5 text-white/30 font-mono text-sm">No challenge today</div>
             )}
