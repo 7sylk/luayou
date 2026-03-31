@@ -25,6 +25,7 @@ class UserResponse(BaseModel):
     lessons_completed: int = 0
     daily_completed: int = 0
     perfect_quizzes: int = 0
+    email_verified: bool = True
     last_active: Optional[str] = None
     created_at: str
 
@@ -101,3 +102,14 @@ class AiTutorResponse(BaseModel):
 
 class ProfileUpdate(BaseModel):
     username: Optional[str] = None
+
+
+class AdminUserUpdate(BaseModel):
+    username: Optional[str] = None
+    xp: Optional[int] = None
+    level: Optional[int] = None
+    streak: Optional[int] = None
+    lessons_completed: Optional[int] = None
+    daily_completed: Optional[int] = None
+    perfect_quizzes: Optional[int] = None
+    badges: Optional[List[str]] = None

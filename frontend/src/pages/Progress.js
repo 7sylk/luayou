@@ -233,7 +233,7 @@ export default function Progress() {
             <Trophy size={32} className="mx-auto mb-3 text-white/60" />
             <h2 className="font-mono font-bold text-xl mb-2">Course complete!</h2>
             <p className="text-sm text-white/50 mb-4">
-              You've completed all 15 Lua lessons. You're now a Lua developer.
+              You've completed all {data.total_lessons} Lua lessons. You're now a Lua developer.
             </p>
             <p className="font-mono text-xs text-white/30">
               Total XP earned: {data.current_xp.toLocaleString()}

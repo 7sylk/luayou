@@ -308,6 +308,8 @@ DAILY_TEMPLATES = [
     },
 ]
 
+QUIZZES = []
+
 
 async def seed_database(db):
     existing = await db.lessons.count_documents({})
@@ -334,6 +336,8 @@ async def seed_database(db):
     await db.daily_challenges.create_index("date")
     await db.user_daily.create_index([("user_id", 1), ("date", 1)], unique=True)
     await db.daily_templates.create_index("id")
+    await db.email_verifications.create_index("email", unique=True)
+    await db.password_resets.create_index("email", unique=True)
 
     # Seed admin user
     from utils import hash_password

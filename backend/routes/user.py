@@ -1,9 +1,17 @@
 from fastapi import APIRouter, HTTPException, Request
-from models import UserResponse, ProfileUpdate
+from models import UserResponse, ProfileUpdate, AdminUserUpdate
 from database import db
 from utils import get_current_user, xp_for_next_level, check_badges
+import os
 
 router = APIRouter(prefix="/api/user", tags=["user"])
+
+
+def _require_admin(user: dict):
+    admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
+    user_email = user.get("email", "").strip().lower()
+    if not admin_email or user_email != admin_email:
+        raise HTTPException(status_code=403, detail="Admin access required")
 
 
 @router.get("/profile", response_model=UserResponse)
@@ -125,3 +133,93 @@ async def get_progress(request: Request):
             "advanced": {"total": len(advanced), "completed": sum(1 for l in advanced if l["completed"])},
         },
     }
+
+
+@router.get("/admin/check")
+async def admin_check(request: Request):
+    user = await get_current_user(request, db)
+    admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
+    return {"is_admin": bool(admin_email and user.get("email", "").strip().lower() == admin_email)}
+
+
+@router.get("/admin/users")
+async def list_users_admin(request: Request):
+    user = await get_current_user(request, db)
+    _require_admin(user)
+
+    users = await db.users.find(
+        {},
+        {"_id": 0, "password_hash": 0},
+    ).to_list(1000)
+    users.sort(key=lambda u: u.get("created_at", ""), reverse=True)
+    return users
+
+
+@router.put("/admin/users/{user_id}")
+async def update_user_admin(user_id: str, data: AdminUserUpdate, request: Request):
+    user = await get_current_user(request, db)
+    _require_admin(user)
+
+    existing = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    update = {}
+    if data.username is not None:
+        username = data.username.strip()
+        if not username:
+            raise HTTPException(status_code=400, detail="Username cannot be empty")
+        duplicate = await db.users.find_one(
+            {"username": username, "id": {"$ne": user_id}}, {"_id": 0}
+        )
+        if duplicate:
+            raise HTTPException(status_code=400, detail="Username already taken")
+        update["username"] = username
+
+    for field in [
+        "xp",
+        "streak",
+        "lessons_completed",
+        "daily_completed",
+        "perfect_quizzes",
+    ]:
+        value = getattr(data, field)
+        if value is not None:
+            if value < 0:
+                raise HTTPException(status_code=400, detail=f"{field} cannot be negative")
+            update[field] = value
+
+    if data.level is not None:
+        if data.level < 1:
+            raise HTTPException(status_code=400, detail="level must be at least 1")
+        update["level"] = data.level
+
+    if data.badges is not None:
+        update["badges"] = [b.strip() for b in data.badges if isinstance(b, str) and b.strip()]
+
+    if not update:
+        return existing
+
+    await db.users.update_one({"id": user_id}, {"$set": update})
+    updated = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    return updated
+
+
+@router.delete("/admin/users/{user_id}")
+async def delete_user_admin(user_id: str, request: Request):
+    user = await get_current_user(request, db)
+    _require_admin(user)
+
+    target = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
+    if target.get("email", "").strip().lower() == admin_email:
+        raise HTTPException(status_code=400, detail="Cannot delete admin account")
+
+    await db.users.delete_one({"id": user_id})
+    await db.user_progress.delete_many({"user_id": user_id})
+    await db.user_daily.delete_many({"user_id": user_id})
+    return {"message": "User deleted"}
+

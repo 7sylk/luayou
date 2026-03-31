@@ -1,5 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/AuthContext";
+import { developerAPI } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { SignOut, Lightning } from "@phosphor-icons/react";
 
@@ -14,6 +16,18 @@ export default function Header() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      setIsAdmin(false);
+      return;
+    }
+    developerAPI
+      .check()
+      .then((res) => setIsAdmin(Boolean(res.data?.is_admin)))
+      .catch(() => setIsAdmin(false));
+  }, [user]);
 
   const handleLogout = () => {
     logout();
@@ -50,6 +64,21 @@ export default function Header() {
                 {item.label}
               </Button>
             ))}
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className={`rounded-none font-mono text-xs uppercase tracking-wider ${
+                  location.pathname === "/developer"
+                    ? "text-white bg-white/5"
+                    : "text-white/40 hover:text-white hover:bg-white/5"
+                }`}
+                onClick={() => navigate("/developer")}
+                data-testid="nav-developer"
+              >
+                Developer
+              </Button>
+            )}
           </nav>
         </div>
         <div className="flex items-center gap-4">

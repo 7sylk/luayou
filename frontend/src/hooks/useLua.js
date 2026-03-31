@@ -53,13 +53,14 @@ export function useLua() {
       setOutput(result);
 
       if (expectedOutput !== null) {
-        const passed = result === expectedOutput.trim();
+        const expected = String(expectedOutput ?? "").trim();
+        const passed = result === expected;
         setSuccess(passed);
         if (!passed) {
-          setError(`Expected:\n${expectedOutput.trim()}\nGot:\n${result}`);
+          setError(`Expected:\n${expected}\nGot:\n${result}`);
         }
         setRunning(false);
-        return { output: result, error: passed ? "" : `Expected:\n${expectedOutput.trim()}\nGot:\n${result}`, success: passed };
+        return { output: result, error: passed ? "" : `Expected:\n${expected}\nGot:\n${result}`, success: passed };
       } else {
         setSuccess(true);
         setRunning(false);

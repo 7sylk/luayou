@@ -70,6 +70,13 @@ export const userAPI = {
   progress: () => api.get("/user/progress"),
 };
 
+export const developerAPI = {
+  check: () => api.get("/user/admin/check"),
+  listUsers: () => api.get("/user/admin/users"),
+  updateUser: (userId, data) => api.put(`/user/admin/users/${userId}`, data),
+  deleteUser: (userId) => api.delete(`/user/admin/users/${userId}`),
+};
+
 export function formatApiError(detail) {
   if (detail == null) return "Something went wrong.";
   if (typeof detail === "string") return detail;

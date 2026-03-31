@@ -9,6 +9,7 @@ import LessonDetail from "@/pages/LessonDetail";
 import Profile from "@/pages/Profile";
 import Leaderboard from "@/pages/Leaderboard";
 import Progress from "@/pages/Progress";
+import Developer from "@/pages/Developer";
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -45,6 +46,7 @@ function AppRoutes() {
       <Route path="/lessons" element={<ProtectedRoute><Lessons /></ProtectedRoute>} />
       <Route path="/lessons/:id" element={<ProtectedRoute><LessonDetail /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+      <Route path="/developer" element={<ProtectedRoute><Developer /></ProtectedRoute>} />
       <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
       <Route path="/progress" element={<ProtectedRoute><Progress /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />

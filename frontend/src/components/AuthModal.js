@@ -12,6 +12,7 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
   const [resetToken, setResetToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -39,11 +40,35 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
   const handleRegister = async () => {
     setLoading(true);
     try {
-      const res = await axios.post(`${API}/api/auth/register`, { email, password, username });
-      setSession(res.data.token, res.data.user);
-      close();
+      await axios.post(`${API}/api/auth/register`, { email, password, username });
+      toast.success("Account created. Check your email for a verification code.");
+      setMode("verify");
     } catch (e) {
       toast.error(e.response?.data?.detail || "Registration failed");
+    }
+    setLoading(false);
+  };
+
+  const handleVerify = async () => {
+    setLoading(true);
+    try {
+      await axios.post(`${API}/api/auth/verify-email`, { email, code: verificationCode });
+      toast.success("Email verified. You can now sign in.");
+      setMode("login");
+      setVerificationCode("");
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Verification failed");
+    }
+    setLoading(false);
+  };
+
+  const handleResendVerification = async () => {
+    setLoading(true);
+    try {
+      await axios.post(`${API}/api/auth/resend-verification`, { email });
+      toast.success("Verification code sent if email exists.");
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Failed to resend verification");
     }
     setLoading(false);
   };
@@ -51,14 +76,11 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
   const handleForgot = async () => {
     setLoading(true);
     try {
-      const res = await axios.post(`${API}/api/auth/forgot-password`, { email });
-      toast.success("Reset token generated");
-      if (res.data.reset_token) {
-        setResetToken(res.data.reset_token);
-      }
+      await axios.post(`${API}/api/auth/forgot-password`, { email });
+      toast.success("Reset code sent if email exists.");
       setMode("reset");
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Failed to generate reset token");
+      toast.error(e.response?.data?.detail || "Failed to send reset code");
     }
     setLoading(false);
   };
@@ -86,6 +108,7 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
     if (e.key === "Enter") {
       if (mode === "login") handleLogin();
       else if (mode === "register") handleRegister();
+      else if (mode === "verify") handleVerify();
       else if (mode === "forgot") handleForgot();
       else if (mode === "reset") handleReset();
     }
@@ -101,6 +124,7 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
           <span className="font-mono text-xs uppercase tracking-widest text-white/40">
             {mode === "login" && "Sign in"}
             {mode === "register" && "Create account"}
+            {mode === "verify" && "Verify email"}
             {mode === "forgot" && "Forgot password"}
             {mode === "reset" && "Reset password"}
           </span>
@@ -202,10 +226,50 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
             </>
           )}
 
+          {mode === "verify" && (
+            <>
+              <p className="font-mono text-xs text-white/40">
+                Enter the 6-digit code sent to your email.
+              </p>
+              <input
+                className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
+                placeholder="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              <input
+                className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
+                placeholder="verification code"
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value)}
+              />
+              <Button
+                className="w-full bg-white text-black hover:bg-neutral-200 font-mono text-xs uppercase tracking-wider rounded-none"
+                onClick={handleVerify}
+                disabled={loading}
+              >
+                {loading ? "..." : "Verify email"}
+              </Button>
+              <button
+                className="font-mono text-xs text-white/30 hover:text-white"
+                onClick={handleResendVerification}
+              >
+                Resend verification code
+              </button>
+              <button
+                className="font-mono text-xs text-white/30 hover:text-white"
+                onClick={() => setMode("login")}
+              >
+                Back to sign in
+              </button>
+            </>
+          )}
+
           {mode === "forgot" && (
             <>
               <p className="font-mono text-xs text-white/40">
-                Enter your email and we'll generate a reset token.
+                Enter your email and we'll send a reset code.
               </p>
               <input
                 className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
@@ -219,7 +283,7 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
                 onClick={handleForgot}
                 disabled={loading}
               >
-                {loading ? "..." : "Generate reset token"}
+                {loading ? "..." : "Send reset code"}
               </Button>
               <button
                 className="font-mono text-xs text-white/30 hover:text-white"
@@ -233,11 +297,11 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
           {mode === "reset" && (
             <>
               <p className="font-mono text-xs text-white/40">
-                Paste your reset token and choose a new password.
+                Enter your reset code and choose a new password.
               </p>
               <input
                 className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
-                placeholder="reset token"
+                placeholder="reset code"
                 value={resetToken}
                 onChange={(e) => setResetToken(e.target.value)}
               />

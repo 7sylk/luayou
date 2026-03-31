@@ -29,6 +29,12 @@ async def get_daily_challenge(request: Request):
     user_daily = await db.user_daily.find_one(
         {"user_id": user["id"], "date": today}, {"_id": 0}
     )
+    challenge["challenge_starter_code"] = challenge.get(
+        "challenge_starter_code", challenge.get("starter_code", "")
+    )
+    challenge["challenge_expected_output"] = challenge.get(
+        "challenge_expected_output", challenge.get("expected_output", "")
+    )
     challenge["completed"] = bool(user_daily and user_daily.get("completed"))
 
     return challenge

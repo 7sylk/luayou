@@ -24,6 +24,7 @@ export default function LessonDetail() {
   const [challengePassed, setChallengePassed] = useState(false);
   const [activeTab, setActiveTab] = useState("lesson");
   const [mobileView, setMobileView] = useState("lesson"); // lesson | editor
+  const [totalLessons, setTotalLessons] = useState(1);
 
   const fetchLesson = useCallback(async () => {
     try {
@@ -39,6 +40,12 @@ export default function LessonDetail() {
   }, [id, navigate]);
 
   useEffect(() => { fetchLesson(); }, [fetchLesson]);
+  useEffect(() => {
+    lessonsAPI
+      .list()
+      .then((res) => setTotalLessons(Math.max(1, res.data?.length || 1)))
+      .catch(() => {});
+  }, []);
 
   const handleComplete = async () => {
     if (!challengePassed) {
@@ -73,7 +80,7 @@ export default function LessonDetail() {
 
   const lessonNum = lesson.order_index;
   const prevId = lessonNum > 1 ? `lesson-${String(lessonNum - 1).padStart(2, "0")}` : null;
-  const nextId = lessonNum < 15 ? `lesson-${String(lessonNum + 1).padStart(2, "0")}` : null;
+  const nextId = lessonNum < totalLessons ? `lesson-${String(lessonNum + 1).padStart(2, "0")}` : null;
 
   return (
     <div className="min-h-screen bg-background" data-testid="lesson-detail-page">
@@ -125,7 +132,7 @@ export default function LessonDetail() {
                 <ArrowLeft size={12} />
               </Button>
             )}
-            <span className="font-mono text-xs text-white/20">{lessonNum}/15</span>
+            <span className="font-mono text-xs text-white/20">{lessonNum}/{totalLessons}</span>
             {nextId && (
               <Button
                 variant="ghost"
