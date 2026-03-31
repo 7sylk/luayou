@@ -24,6 +24,7 @@ class UserResponse(BaseModel):
     badges: List[str] = []
     lessons_completed: int = 0
     daily_completed: int = 0
+    perfect_quizzes: int = 0
     last_active: Optional[str] = None
     created_at: str
 
@@ -73,12 +74,17 @@ class QuizResult(BaseModel):
 class CodeRequest(BaseModel):
     code: str
     lesson_id: Optional[str] = None
+    output: Optional[str] = None
+    success: Optional[bool] = None
+    error: Optional[str] = None
+    check_only: Optional[bool] = False
 
 
 class CodeResponse(BaseModel):
     output: str
     success: bool
     error: Optional[str] = None
+    expected_output: Optional[str] = None
 
 
 class AiTutorRequest(BaseModel):

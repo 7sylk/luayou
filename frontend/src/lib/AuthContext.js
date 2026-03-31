@@ -38,6 +38,11 @@ export function AuthProvider({ children }) {
     return userData;
   };
 
+  const setSession = (token, userData) => {
+    localStorage.setItem("luayou_token", token);
+    setUser(userData);
+  };
+
   const logout = () => {
     localStorage.removeItem("luayou_token");
     setUser(null);
@@ -53,7 +58,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser, setSession }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,176 +1,270 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/AuthContext";
-import { formatApiError } from "@/lib/api";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import axios from "axios";
+import { toast } from "sonner";
 
-export default function AuthModal({ open, onOpenChange, defaultTab = "login" }) {
-  const { login, register } = useAuth();
-  const navigate = useNavigate();
-  const [tab, setTab] = useState(defaultTab);
-  const [error, setError] = useState("");
+const API = process.env.REACT_APP_BACKEND_URL || "http://localhost:8001";
+
+export default function AuthModal({ open, onOpenChange, defaultTab }) {
+  const { setSession } = useAuth();
+  const [mode, setMode] = useState(defaultTab || "login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
+  const [resetToken, setResetToken] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-  const [regEmail, setRegEmail] = useState("");
-  const [regPassword, setRegPassword] = useState("");
-  const [regUsername, setRegUsername] = useState("");
+  useEffect(() => {
+    setMode(defaultTab || "login");
+  }, [defaultTab]);
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setError("");
+  if (!open) return null;
+
+  const close = () => onOpenChange(false);
+
+  const handleLogin = async () => {
     setLoading(true);
     try {
-      await login(loginEmail, loginPassword);
-      onOpenChange(false);
-      navigate("/dashboard");
-    } catch (err) {
-      setError(formatApiError(err.response?.data?.detail) || "Login failed");
+      const res = await axios.post(`${API}/api/auth/login`, { email, password });
+      setSession(res.data.token, res.data.user);
+      close();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Login failed");
     }
     setLoading(false);
   };
 
-  const handleRegister = async (e) => {
-    e.preventDefault();
-    setError("");
+  const handleRegister = async () => {
     setLoading(true);
     try {
-      await register(regEmail, regPassword, regUsername);
-      onOpenChange(false);
-      navigate("/dashboard");
-    } catch (err) {
-      setError(formatApiError(err.response?.data?.detail) || "Registration failed");
+      const res = await axios.post(`${API}/api/auth/register`, { email, password, username });
+      setSession(res.data.token, res.data.user);
+      close();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Registration failed");
     }
     setLoading(false);
+  };
+
+  const handleForgot = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API}/api/auth/forgot-password`, { email });
+      toast.success("Reset token generated");
+      if (res.data.reset_token) {
+        setResetToken(res.data.reset_token);
+      }
+      setMode("reset");
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Failed to generate reset token");
+    }
+    setLoading(false);
+  };
+
+  const handleReset = async () => {
+    setLoading(true);
+    try {
+      await axios.post(`${API}/api/auth/reset-password`, {
+        token: resetToken,
+        password: newPassword,
+      });
+      toast.success("Password reset! Please log in.");
+      setMode("login");
+      setPassword("");
+      setResetToken("");
+      setNewPassword("");
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Reset failed");
+    }
+    setLoading(false);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Escape") close();
+    if (e.key === "Enter") {
+      if (mode === "login") handleLogin();
+      else if (mode === "register") handleRegister();
+      else if (mode === "forgot") handleForgot();
+      else if (mode === "reset") handleReset();
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card border-white/10 rounded-none sm:max-w-md p-0 gap-0" data-testid="auth-modal">
-        <DialogHeader className="p-6 pb-0">
-          <DialogTitle className="font-mono font-bold text-lg tracking-tight">
-            lua<span className="text-muted-foreground">you</span>
-          </DialogTitle>
-        </DialogHeader>
-        <Tabs value={tab} onValueChange={(v) => { setTab(v); setError(""); }} className="p-6 pt-4">
-          <TabsList className="bg-transparent border border-white/10 rounded-none h-auto p-0 w-full grid grid-cols-2">
-            <TabsTrigger
-              value="login"
-              className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-white data-[state=active]:text-black"
-              data-testid="auth-tab-login"
-            >
-              Log in
-            </TabsTrigger>
-            <TabsTrigger
-              value="register"
-              className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-white data-[state=active]:text-black"
-              data-testid="auth-tab-register"
-            >
-              Sign up
-            </TabsTrigger>
-          </TabsList>
+    <div
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) close(); }}
+    >
+      <div className="bg-background border border-white/10 w-full max-w-sm" data-testid="auth-modal">
+        <div className="border-b border-white/10 px-6 py-4 flex items-center justify-between">
+          <span className="font-mono text-xs uppercase tracking-widest text-white/40">
+            {mode === "login" && "Sign in"}
+            {mode === "register" && "Create account"}
+            {mode === "forgot" && "Forgot password"}
+            {mode === "reset" && "Reset password"}
+          </span>
+          <button
+            onClick={close}
+            className="font-mono text-xs text-white/30 hover:text-white"
+            data-testid="auth-modal-close"
+          >
+            ✕
+          </button>
+        </div>
 
-          {error && (
-            <p className="mt-4 text-sm text-red-400 font-mono" data-testid="auth-error">{error}</p>
+        <div className="p-6 space-y-4" onKeyDown={handleKeyDown}>
+          {mode === "login" && (
+            <>
+              <input
+                className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
+                placeholder="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                data-testid="email-input"
+              />
+              <input
+                className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
+                placeholder="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                data-testid="password-input"
+              />
+              <Button
+                className="w-full bg-white text-black hover:bg-neutral-200 font-mono text-xs uppercase tracking-wider rounded-none"
+                onClick={handleLogin}
+                disabled={loading}
+                data-testid="login-btn"
+              >
+                {loading ? "..." : "Sign in"}
+              </Button>
+              <div className="flex justify-between">
+                <button
+                  className="font-mono text-xs text-white/30 hover:text-white"
+                  onClick={() => setMode("register")}
+                  data-testid="switch-to-register"
+                >
+                  Create account
+                </button>
+                <button
+                  className="font-mono text-xs text-white/30 hover:text-white"
+                  onClick={() => setMode("forgot")}
+                  data-testid="forgot-password-link"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            </>
           )}
 
-          <TabsContent value="login" className="mt-4 space-y-4">
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <Label htmlFor="login-email" className="font-mono text-xs uppercase tracking-wider text-white/60">Email</Label>
-                <Input
-                  id="login-email"
-                  type="email"
-                  value={loginEmail}
-                  onChange={(e) => setLoginEmail(e.target.value)}
-                  className="mt-1 rounded-none bg-secondary border-white/10 focus:border-white font-mono text-sm"
-                  placeholder="you@example.com"
-                  required
-                  data-testid="login-email-input"
-                />
-              </div>
-              <div>
-                <Label htmlFor="login-password" className="font-mono text-xs uppercase tracking-wider text-white/60">Password</Label>
-                <Input
-                  id="login-password"
-                  type="password"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  className="mt-1 rounded-none bg-secondary border-white/10 focus:border-white font-mono text-sm"
-                  placeholder="password"
-                  required
-                  data-testid="login-password-input"
-                />
-              </div>
+          {mode === "register" && (
+            <>
+              <input
+                className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
+                placeholder="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                data-testid="username-input"
+              />
+              <input
+                className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
+                placeholder="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                data-testid="email-input"
+              />
+              <input
+                className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
+                placeholder="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                data-testid="password-input"
+              />
               <Button
-                type="submit"
-                className="w-full bg-white text-black hover:bg-neutral-200 font-mono text-xs uppercase tracking-wider rounded-none h-10"
+                className="w-full bg-white text-black hover:bg-neutral-200 font-mono text-xs uppercase tracking-wider rounded-none"
+                onClick={handleRegister}
                 disabled={loading}
-                data-testid="login-submit-btn"
-              >
-                {loading ? "..." : "Log in"}
-              </Button>
-            </form>
-          </TabsContent>
-
-          <TabsContent value="register" className="mt-4 space-y-4">
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div>
-                <Label htmlFor="reg-username" className="font-mono text-xs uppercase tracking-wider text-white/60">Username</Label>
-                <Input
-                  id="reg-username"
-                  type="text"
-                  value={regUsername}
-                  onChange={(e) => setRegUsername(e.target.value)}
-                  className="mt-1 rounded-none bg-secondary border-white/10 focus:border-white font-mono text-sm"
-                  placeholder="username"
-                  required
-                  data-testid="register-username-input"
-                />
-              </div>
-              <div>
-                <Label htmlFor="reg-email" className="font-mono text-xs uppercase tracking-wider text-white/60">Email</Label>
-                <Input
-                  id="reg-email"
-                  type="email"
-                  value={regEmail}
-                  onChange={(e) => setRegEmail(e.target.value)}
-                  className="mt-1 rounded-none bg-secondary border-white/10 focus:border-white font-mono text-sm"
-                  placeholder="you@example.com"
-                  required
-                  data-testid="register-email-input"
-                />
-              </div>
-              <div>
-                <Label htmlFor="reg-password" className="font-mono text-xs uppercase tracking-wider text-white/60">Password</Label>
-                <Input
-                  id="reg-password"
-                  type="password"
-                  value={regPassword}
-                  onChange={(e) => setRegPassword(e.target.value)}
-                  className="mt-1 rounded-none bg-secondary border-white/10 focus:border-white font-mono text-sm"
-                  placeholder="min 6 characters"
-                  required
-                  data-testid="register-password-input"
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full bg-white text-black hover:bg-neutral-200 font-mono text-xs uppercase tracking-wider rounded-none h-10"
-                disabled={loading}
-                data-testid="register-submit-btn"
+                data-testid="register-btn"
               >
                 {loading ? "..." : "Create account"}
               </Button>
-            </form>
-          </TabsContent>
-        </Tabs>
-      </DialogContent>
-    </Dialog>
+              <button
+                className="font-mono text-xs text-white/30 hover:text-white"
+                onClick={() => setMode("login")}
+                data-testid="switch-to-login"
+              >
+                Already have an account?
+              </button>
+            </>
+          )}
+
+          {mode === "forgot" && (
+            <>
+              <p className="font-mono text-xs text-white/40">
+                Enter your email and we'll generate a reset token.
+              </p>
+              <input
+                className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
+                placeholder="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              <Button
+                className="w-full bg-white text-black hover:bg-neutral-200 font-mono text-xs uppercase tracking-wider rounded-none"
+                onClick={handleForgot}
+                disabled={loading}
+              >
+                {loading ? "..." : "Generate reset token"}
+              </Button>
+              <button
+                className="font-mono text-xs text-white/30 hover:text-white"
+                onClick={() => setMode("login")}
+              >
+                Back to sign in
+              </button>
+            </>
+          )}
+
+          {mode === "reset" && (
+            <>
+              <p className="font-mono text-xs text-white/40">
+                Paste your reset token and choose a new password.
+              </p>
+              <input
+                className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
+                placeholder="reset token"
+                value={resetToken}
+                onChange={(e) => setResetToken(e.target.value)}
+              />
+              <input
+                className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
+                placeholder="new password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+              <Button
+                className="w-full bg-white text-black hover:bg-neutral-200 font-mono text-xs uppercase tracking-wider rounded-none"
+                onClick={handleReset}
+                disabled={loading}
+              >
+                {loading ? "..." : "Reset password"}
+              </Button>
+              <button
+                className="font-mono text-xs text-white/30 hover:text-white"
+                onClick={() => setMode("login")}
+              >
+                Back to sign in
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

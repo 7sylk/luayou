@@ -1,21 +1,26 @@
-import { useState, useEffect } from "react";
-import { codeAPI } from "@/lib/api";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Play, Eraser } from "@phosphor-icons/react";
+import { useLua } from "@/hooks/useLua";
 
-export default function CodeEditor({ lessonId, starterCode, onOutputChange, onCodeChange }) {
+export default function CodeEditor({ lessonId, starterCode, expectedOutput, onOutputChange, onCodeChange, onSuccess }) {
   const [code, setCode] = useState(starterCode || "");
-  const [output, setOutput] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(null);
-  const [running, setRunning] = useState(false);
+  const { runLua, output, error, success, running } = useLua();
+  const textareaRef = useRef(null);
+  const lineNumbersRef = useRef(null);
 
   useEffect(() => {
     setCode(starterCode || "");
-    setOutput("");
-    setError("");
-    setSuccess(null);
   }, [starterCode, lessonId]);
+
+  const lineCount = code.split("\n").length;
+  const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1);
+
+  const syncScroll = () => {
+    if (lineNumbersRef.current && textareaRef.current) {
+      lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop;
+    }
+  };
 
   const handleCodeChange = (val) => {
     setCode(val);
@@ -23,29 +28,16 @@ export default function CodeEditor({ lessonId, starterCode, onOutputChange, onCo
   };
 
   const handleRun = async () => {
-    setRunning(true);
-    setOutput("");
-    setError("");
-    setSuccess(null);
-    try {
-      const res = await codeAPI.run({ code, lesson_id: lessonId });
-      setOutput(res.data.output || "");
-      setError(res.data.error || "");
-      setSuccess(res.data.success);
-      onOutputChange?.(res.data.output || "", res.data.error || "");
-    } catch (e) {
-      const msg = e.response?.data?.detail || "Execution error";
-      setError(msg);
-      onOutputChange?.("", msg);
+    const expected = expectedOutput ?? null;
+    const result = await runLua(code, expected);
+    onOutputChange?.(result.output, result.error);
+    if (result.success === true && expected !== null) {
+      onSuccess?.();
     }
-    setRunning(false);
   };
 
   const handleClear = () => {
     setCode(starterCode || "");
-    setOutput("");
-    setError("");
-    setSuccess(null);
     onCodeChange?.(starterCode || "");
     onOutputChange?.("", "");
   };
@@ -74,6 +66,8 @@ export default function CodeEditor({ lessonId, starterCode, onOutputChange, onCo
       <div className="border-b border-white/10 px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs text-white/30">editor.lua</span>
+          {success === true && <span className="font-mono text-xs text-white/50">[pass]</span>}
+          {success === false && <span className="font-mono text-xs text-white/30">[fail]</span>}
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -98,13 +92,34 @@ export default function CodeEditor({ lessonId, starterCode, onOutputChange, onCo
         </div>
       </div>
 
-      {/* Editor */}
-      <div className="flex-1 min-h-0 overflow-hidden">
+      {/* Editor with line numbers */}
+      <div className="flex-1 min-h-0 overflow-hidden flex">
+        {/* Line numbers */}
+        <div
+          ref={lineNumbersRef}
+          className="bg-background border-r border-white/5 pt-4 pb-4 overflow-hidden select-none"
+          style={{ minWidth: "3rem" }}
+        >
+          {lineNumbers.map((n) => (
+            <div
+              key={n}
+              className="font-mono text-xs text-white/20 text-right pr-3 leading-6"
+              style={{ fontSize: "13px", lineHeight: "1.5rem" }}
+            >
+              {n}
+            </div>
+          ))}
+        </div>
+
+        {/* Textarea */}
         <textarea
-          className="code-editor-textarea w-full h-full p-4 bg-background"
+          ref={textareaRef}
+          className="flex-1 p-4 bg-background font-mono text-sm text-white/80 resize-none outline-none leading-6"
+          style={{ fontSize: "13px", lineHeight: "1.5rem" }}
           value={code}
           onChange={(e) => handleCodeChange(e.target.value)}
           onKeyDown={handleKeyDown}
+          onScroll={syncScroll}
           spellCheck={false}
           placeholder="-- Write your Lua code here..."
           data-testid="code-textarea"
@@ -115,23 +130,14 @@ export default function CodeEditor({ lessonId, starterCode, onOutputChange, onCo
       <div className="border-t border-white/10" data-testid="code-output-panel">
         <div className="px-4 py-2 border-b border-white/5 flex items-center gap-2">
           <span className="font-mono text-xs text-white/30">output</span>
-          {success !== null && (
-            <span className={`font-mono text-xs ${success ? "text-white/60" : "text-white/40"}`}>
-              {success ? "[pass]" : "[fail]"}
-            </span>
-          )}
           <span className="font-mono text-xs text-white/20 ml-auto">ctrl+enter to run</span>
         </div>
         <div className="p-4 min-h-[80px] max-h-[200px] overflow-y-auto">
           {output && (
-            <div className="terminal-output text-white/70" data-testid="code-output">
-              {output}
-            </div>
+            <div className="terminal-output text-white/70" data-testid="code-output">{output}</div>
           )}
           {error && (
-            <div className="terminal-output text-white/40" data-testid="code-error">
-              {error}
-            </div>
+            <div className="terminal-output text-white/40" data-testid="code-error">{error}</div>
           )}
           {!output && !error && (
             <span className="font-mono text-xs text-white/15">Run your code to see output here</span>

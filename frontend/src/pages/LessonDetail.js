@@ -21,7 +21,9 @@ export default function LessonDetail() {
   const [codeError, setCodeError] = useState("");
   const [currentCode, setCurrentCode] = useState("");
   const [completed, setCompleted] = useState(false);
+  const [challengePassed, setChallengePassed] = useState(false);
   const [activeTab, setActiveTab] = useState("lesson");
+  const [mobileView, setMobileView] = useState("lesson"); // lesson | editor
 
   const fetchLesson = useCallback(async () => {
     try {
@@ -29,6 +31,7 @@ export default function LessonDetail() {
       setLesson(res.data);
       setCurrentCode(res.data.challenge_starter_code || "");
       setCompleted(res.data.completed);
+      setChallengePassed(false);
       setLoading(false);
     } catch {
       navigate("/lessons");
@@ -38,6 +41,10 @@ export default function LessonDetail() {
   useEffect(() => { fetchLesson(); }, [fetchLesson]);
 
   const handleComplete = async () => {
+    if (!challengePassed) {
+      toast.error("Pass the code challenge first.");
+      return;
+    }
     try {
       const res = await lessonsAPI.complete(id);
       if (res.data.xp_earned > 0) {
@@ -73,7 +80,7 @@ export default function LessonDetail() {
       <Header />
       <main className="pt-14">
         {/* Top bar */}
-        <div className="border-b border-white/10 px-6 py-3 flex items-center justify-between">
+        <div className="border-b border-white/10 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -85,10 +92,27 @@ export default function LessonDetail() {
               <ArrowLeft size={14} className="mr-1" /> Lessons
             </Button>
             <span className="text-white/10">|</span>
-            <span className="font-mono text-xs text-white/40 uppercase tracking-wider">
+            <span className="font-mono text-xs text-white/40 uppercase tracking-wider hidden sm:inline">
               {lesson.difficulty}
             </span>
           </div>
+
+          {/* Mobile view toggle */}
+          <div className="flex items-center gap-1 lg:hidden">
+            <button
+              className={`font-mono text-xs px-3 py-1 border ${mobileView === "lesson" ? "border-white/30 text-white" : "border-white/10 text-white/30"}`}
+              onClick={() => setMobileView("lesson")}
+            >
+              Lesson
+            </button>
+            <button
+              className={`font-mono text-xs px-3 py-1 border ${mobileView === "editor" ? "border-white/30 text-white" : "border-white/10 text-white/30"}`}
+              onClick={() => setMobileView("editor")}
+            >
+              Editor
+            </button>
+          </div>
+
           <div className="flex items-center gap-2">
             {prevId && (
               <Button
@@ -116,9 +140,12 @@ export default function LessonDetail() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2" style={{ height: "calc(100vh - 7rem)" }}>
-          {/* Left Panel - Lesson Content */}
-          <div className="border-r border-white/10 overflow-y-auto">
+        {/* Desktop: side by side. Mobile: toggled single panel */}
+        <div className="lg:grid lg:grid-cols-2" style={{ height: "calc(100vh - 7rem)" }}>
+          {/* Left panel — lesson content */}
+          <div
+            className={`border-r border-white/10 overflow-y-auto h-full ${mobileView === "editor" ? "hidden lg:block" : "block"}`}
+          >
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="bg-transparent border-b border-white/10 rounded-none h-auto p-0 w-full grid grid-cols-3">
                 <TabsTrigger value="lesson" className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-white/5 data-[state=active]:text-white" data-testid="tab-lesson">
@@ -143,6 +170,7 @@ export default function LessonDetail() {
                     </span>
                   )}
                 </div>
+
                 <div className="text-sm text-white/70 leading-relaxed whitespace-pre-line mb-6" data-testid="lesson-content">
                   {lesson.content}
                 </div>
@@ -159,20 +187,46 @@ export default function LessonDetail() {
                   <p className="text-sm text-white/60 mb-4" data-testid="challenge-description">
                     {lesson.challenge_description}
                   </p>
-                  <p className="font-mono text-xs text-white/30">
+                  <p className="font-mono text-xs text-white/30 mb-6">
                     Expected output: <code className="text-white/50">{lesson.challenge_expected_output}</code>
                   </p>
-                </div>
 
-                {!completed && (
-                  <Button
-                    className="mt-6 bg-white text-black hover:bg-neutral-200 font-mono text-xs uppercase tracking-wider rounded-none"
-                    onClick={handleComplete}
-                    data-testid="mark-complete-btn"
-                  >
-                    Mark as complete (+{lesson.xp_reward} XP)
-                  </Button>
-                )}
+                  {!completed && (
+                    <div>
+                      {/* Mobile: button to jump to editor */}
+                      <Button
+                        className="mb-3 lg:hidden bg-white/10 text-white/60 hover:bg-white/20 font-mono text-xs uppercase tracking-wider rounded-none"
+                        onClick={() => setMobileView("editor")}
+                      >
+                        Open Editor
+                      </Button>
+
+                      {challengePassed ? (
+                        <Button
+                          className="block bg-white text-black hover:bg-neutral-200 font-mono text-xs uppercase tracking-wider rounded-none"
+                          onClick={handleComplete}
+                          data-testid="mark-complete-btn"
+                        >
+                          <Check size={12} className="mr-1 inline" />
+                          Mark as complete (+{lesson.xp_reward} XP)
+                        </Button>
+                      ) : (
+                        <div>
+                          <Button
+                            className="bg-white/10 text-white/30 font-mono text-xs uppercase tracking-wider rounded-none cursor-not-allowed"
+                            disabled
+                            data-testid="mark-complete-btn"
+                          >
+                            Pass the challenge to complete
+                          </Button>
+                          <p className="font-mono text-xs text-white/20 mt-2">
+                            Run your code until output matches
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </TabsContent>
 
               <TabsContent value="quiz" className="p-6 m-0">
@@ -185,16 +239,23 @@ export default function LessonDetail() {
             </Tabs>
           </div>
 
-          {/* Right Panel - Code Editor */}
-          <div className="flex flex-col overflow-hidden">
+          {/* Right panel — editor */}
+          <div
+            className={`flex flex-col overflow-hidden h-full ${mobileView === "lesson" ? "hidden lg:flex" : "flex"}`}
+          >
             <CodeEditor
               lessonId={id}
               starterCode={lesson.challenge_starter_code}
+              expectedOutput={lesson.challenge_expected_output}
               onOutputChange={(output, error) => {
                 setCodeOutput(output);
                 setCodeError(error || "");
               }}
               onCodeChange={setCurrentCode}
+              onSuccess={() => {
+                setChallengePassed(true);
+                setMobileView("lesson"); // switch back so they see the complete button
+              }}
             />
           </div>
         </div>

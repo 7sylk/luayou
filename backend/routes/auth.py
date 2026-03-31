@@ -3,7 +3,7 @@ from models import UserCreate, UserLogin, UserResponse, AuthResponse
 from database import db
 from utils import hash_password, verify_password, create_token, get_current_user, calculate_level
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -13,9 +13,7 @@ async def register(data: UserCreate):
     if not data.email or not data.password or not data.username:
         raise HTTPException(status_code=400, detail="All fields are required")
     if len(data.password) < 6:
-        raise HTTPException(
-            status_code=400, detail="Password must be at least 6 characters"
-        )
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
 
     existing = await db.users.find_one({"email": data.email.lower()})
     if existing:
@@ -47,9 +45,7 @@ async def register(data: UserCreate):
 
     await db.users.insert_one(user_doc)
     token = create_token(user_id, data.email.lower())
-    user_response = {
-        k: v for k, v in user_doc.items() if k not in ("_id", "password_hash")
-    }
+    user_response = {k: v for k, v in user_doc.items() if k not in ("_id", "password_hash")}
     return AuthResponse(token=token, user=UserResponse(**user_response))
 
 
@@ -93,3 +89,56 @@ async def login(data: UserLogin):
 async def me(request: Request):
     user = await get_current_user(request, db)
     return UserResponse(**user)
+
+
+@router.post("/forgot-password")
+async def forgot_password(data: dict):
+    email = data.get("email", "").lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    # Always return success to prevent email enumeration
+    if not user:
+        return {"message": "If that email exists, a reset token has been generated."}
+
+    reset_token = str(uuid.uuid4())
+    expires = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+
+    await db.password_resets.update_one(
+        {"email": email},
+        {"$set": {"token": reset_token, "expires": expires, "used": False}},
+        upsert=True,
+    )
+
+    # In production you'd email this. For now, return it directly.
+    return {"message": "Reset token generated.", "reset_token": reset_token}
+
+
+@router.post("/reset-password")
+async def reset_password(data: dict):
+    token = data.get("token", "")
+    new_password = data.get("password", "")
+
+    if not token or not new_password:
+        raise HTTPException(status_code=400, detail="Token and new password are required")
+    if len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    reset = await db.password_resets.find_one({"token": token}, {"_id": 0})
+    if not reset:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    if reset.get("used"):
+        raise HTTPException(status_code=400, detail="Reset token already used")
+
+    expires = datetime.fromisoformat(reset["expires"])
+    if datetime.now(timezone.utc) > expires:
+        raise HTTPException(status_code=400, detail="Reset token has expired")
+
+    await db.users.update_one(
+        {"email": reset["email"]},
+        {"$set": {"password_hash": hash_password(new_password)}},
+    )
+    await db.password_resets.update_one({"token": token}, {"$set": {"used": True}})
+
+    return {"message": "Password reset successfully"}

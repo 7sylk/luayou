@@ -4,6 +4,7 @@ import Header from "@/components/Header";
 import { lessonsAPI } from "@/lib/api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Lock, Check, ArrowRight } from "@phosphor-icons/react";
+import { LessonsSkeleton } from "@/components/Skeleton";
 
 export default function Lessons() {
   const [lessons, setLessons] = useState([]);
@@ -11,7 +12,10 @@ export default function Lessons() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    lessonsAPI.list().then((r) => { setLessons(r.data); setLoading(false); }).catch(() => setLoading(false));
+    lessonsAPI.list()
+      .then((r) => setLessons(r.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   const beginner = lessons.filter((l) => l.difficulty === "beginner");
@@ -31,7 +35,11 @@ export default function Lessons() {
         <div className={`w-8 h-8 flex items-center justify-center border ${
           lesson.completed ? "border-white bg-white text-black" : lesson.locked ? "border-white/10" : "border-white/20"
         }`}>
-          {lesson.completed ? <Check size={14} weight="bold" /> : lesson.locked ? <Lock size={14} weight="regular" /> : (
+          {lesson.completed ? (
+            <Check size={14} weight="bold" />
+          ) : lesson.locked ? (
+            <Lock size={14} weight="regular" />
+          ) : (
             <span className="font-mono text-xs">{lesson.order_index}</span>
           )}
         </div>
@@ -52,6 +60,15 @@ export default function Lessons() {
     </div>
   );
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <LessonsSkeleton />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background" data-testid="lessons-page">
       <Header />
@@ -64,32 +81,28 @@ export default function Lessons() {
           </p>
         </div>
 
-        {loading ? (
-          <div className="font-mono text-sm text-white/30">loading<span className="cursor-blink">_</span></div>
-        ) : (
-          <Tabs defaultValue="beginner" className="animate-fade-in stagger-1">
-            <TabsList className="bg-transparent border border-white/10 rounded-none h-auto p-0 w-full grid grid-cols-3">
-              <TabsTrigger value="beginner" className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-white data-[state=active]:text-black" data-testid="tab-beginner">
-                Beginner ({beginner.length})
-              </TabsTrigger>
-              <TabsTrigger value="intermediate" className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-white data-[state=active]:text-black" data-testid="tab-intermediate">
-                Intermediate ({intermediate.length})
-              </TabsTrigger>
-              <TabsTrigger value="advanced" className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-white data-[state=active]:text-black" data-testid="tab-advanced">
-                Advanced ({advanced.length})
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="beginner" className="mt-6">
-              <LessonList items={beginner} />
-            </TabsContent>
-            <TabsContent value="intermediate" className="mt-6">
-              <LessonList items={intermediate} />
-            </TabsContent>
-            <TabsContent value="advanced" className="mt-6">
-              <LessonList items={advanced} />
-            </TabsContent>
-          </Tabs>
-        )}
+        <Tabs defaultValue="beginner" className="animate-fade-in stagger-1">
+          <TabsList className="bg-transparent border border-white/10 rounded-none h-auto p-0 w-full grid grid-cols-3">
+            <TabsTrigger value="beginner" className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-white data-[state=active]:text-black" data-testid="tab-beginner">
+              Beginner ({beginner.length})
+            </TabsTrigger>
+            <TabsTrigger value="intermediate" className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-white data-[state=active]:text-black" data-testid="tab-intermediate">
+              Intermediate ({intermediate.length})
+            </TabsTrigger>
+            <TabsTrigger value="advanced" className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-white data-[state=active]:text-black" data-testid="tab-advanced">
+              Advanced ({advanced.length})
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="beginner" className="mt-6">
+            <LessonList items={beginner} />
+          </TabsContent>
+          <TabsContent value="intermediate" className="mt-6">
+            <LessonList items={intermediate} />
+          </TabsContent>
+          <TabsContent value="advanced" className="mt-6">
+            <LessonList items={advanced} />
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );

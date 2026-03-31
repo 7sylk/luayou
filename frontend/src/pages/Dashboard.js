@@ -1,11 +1,131 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import { useAuth } from "@/lib/AuthContext";
+import { useLua } from "@/hooks/useLua";
 import { lessonsAPI, dailyAPI, userAPI } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Lightning, Target, BookOpen, ArrowRight } from "@phosphor-icons/react";
+import { Lightning, Target, BookOpen, ArrowRight, Play, Check } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { DashboardSkeleton } from "@/components/Skeleton";
+
+function DailyChallengeCard({ daily, onComplete }) {
+  const [code, setCode] = useState(daily.challenge_starter_code || "");
+  const [expanded, setExpanded] = useState(false);
+  const { runLua, output, error, success, running } = useLua();
+
+  const handleRun = async () => {
+    await runLua(code, daily.challenge_expected_output);
+  };
+
+  const handleComplete = async () => {
+    if (success !== true) {
+      toast.error("Make your code output match the expected result first.");
+      return;
+    }
+    await onComplete();
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const start = e.target.selectionStart;
+      const end = e.target.selectionEnd;
+      const newCode = code.substring(0, start) + "  " + code.substring(end);
+      setCode(newCode);
+      requestAnimationFrame(() => {
+        e.target.selectionStart = e.target.selectionEnd = start + 2;
+      });
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      handleRun();
+    }
+  };
+
+  if (daily.completed) {
+    return (
+      <div className="p-5">
+        <h3 className="font-mono font-bold text-lg mb-1">{daily.title}</h3>
+        <p className="text-sm text-white/50 mb-3">{daily.description}</p>
+        <span className="font-mono text-xs text-white/40 uppercase flex items-center gap-1">
+          <Check size={12} /> Completed · +{daily.xp_reward} XP
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-5">
+      <h3 className="font-mono font-bold text-lg mb-1">{daily.title}</h3>
+      <p className="text-sm text-white/50 mb-2">{daily.description}</p>
+      <p className="font-mono text-xs text-white/30 mb-4">
+        Expected: <code className="text-white/50">{daily.challenge_expected_output}</code>
+      </p>
+
+      {!expanded ? (
+        <Button
+          size="sm"
+          className="bg-white text-black hover:bg-neutral-200 font-mono text-xs uppercase tracking-wider rounded-none"
+          onClick={() => setExpanded(true)}
+        >
+          Start Challenge
+        </Button>
+      ) : (
+        <div className="border border-white/10">
+          <div className="border-b border-white/10 px-3 py-1.5 flex items-center justify-between">
+            <span className="font-mono text-xs text-white/20">daily.lua</span>
+            <Button
+              size="sm"
+              className="bg-white text-black hover:bg-neutral-200 rounded-none font-mono text-xs uppercase tracking-wider h-6 px-3"
+              onClick={handleRun}
+              disabled={running}
+            >
+              <Play size={10} weight="fill" className="mr-1" />
+              {running ? "..." : "Run"}
+            </Button>
+          </div>
+
+          <textarea
+            className="code-editor-textarea w-full p-3 bg-background font-mono text-sm"
+            style={{ minHeight: "120px", resize: "vertical" }}
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            onKeyDown={handleKeyDown}
+            spellCheck={false}
+          />
+
+          {(output || error) && (
+            <div className="border-t border-white/10 p-3">
+              {output && (
+                <div className="font-mono text-xs text-white/60 whitespace-pre">{output}</div>
+              )}
+              {error && (
+                <div className="font-mono text-xs text-white/40 whitespace-pre">{error}</div>
+              )}
+            </div>
+          )}
+
+          <div className="border-t border-white/10 px-3 py-2 flex items-center justify-between">
+            <span className="font-mono text-xs text-white/30">+{daily.xp_reward} XP</span>
+            <Button
+              size="sm"
+              className={`rounded-none font-mono text-xs uppercase tracking-wider h-7 px-4 ${
+                success === true
+                  ? "bg-white text-black hover:bg-neutral-200"
+                  : "bg-white/10 text-white/30 cursor-not-allowed"
+              }`}
+              onClick={handleComplete}
+              disabled={success !== true}
+            >
+              {success === true ? "Complete" : "Run first"}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const { user, refreshUser } = useAuth();
@@ -13,12 +133,15 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [lessons, setLessons] = useState([]);
   const [daily, setDaily] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [loadingDaily, setLoadingDaily] = useState(false);
 
   useEffect(() => {
-    userAPI.stats().then((r) => setStats(r.data)).catch(() => {});
-    lessonsAPI.list().then((r) => setLessons(r.data)).catch(() => {});
-    dailyAPI.get().then((r) => setDaily(r.data)).catch(() => {});
+    Promise.all([
+      userAPI.stats().then((r) => setStats(r.data)).catch(() => {}),
+      lessonsAPI.list().then((r) => setLessons(r.data)).catch(() => {}),
+      dailyAPI.get().then((r) => setDaily(r.data)).catch(() => {}),
+    ]).finally(() => setLoading(false));
   }, []);
 
   const xp = stats?.xp || user?.xp || 0;
@@ -26,17 +149,24 @@ export default function Dashboard() {
   const streak = stats?.streak || user?.streak || 0;
   const nextLevelXp = stats?.xp_for_next_level || (level * level * 100);
   const prevLevelXp = ((level - 1) * (level - 1)) * 100;
-  const progressPct = nextLevelXp > prevLevelXp ? Math.min(100, ((xp - prevLevelXp) / (nextLevelXp - prevLevelXp)) * 100) : 0;
+  const progressPct = nextLevelXp > prevLevelXp
+    ? Math.min(100, ((xp - prevLevelXp) / (nextLevelXp - prevLevelXp)) * 100)
+    : 0;
   const completedCount = stats?.lessons_completed || 0;
   const recentLessons = lessons.slice(0, 5);
 
-  const handleCompleteDaily = async () => {
-    if (daily?.completed) return;
+  const handleCompleteDaily = useCallback(async () => {
     setLoadingDaily(true);
     try {
       const res = await dailyAPI.complete();
       toast.success(`+${res.data.xp_earned} XP earned!`);
-      setDaily({ ...daily, completed: true });
+      if (res.data.new_streak > 1) {
+        toast.success(`${res.data.new_streak} day streak!`);
+      }
+      if (res.data.new_badges?.length > 0) {
+        toast.success(`New badge: ${res.data.new_badges.join(", ")}`);
+      }
+      setDaily((d) => ({ ...d, completed: true }));
       await refreshUser();
       const s = await userAPI.stats();
       setStats(s.data);
@@ -44,7 +174,16 @@ export default function Dashboard() {
       toast.error(e.response?.data?.detail || "Failed to complete");
     }
     setLoadingDaily(false);
-  };
+  }, [refreshUser]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <DashboardSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background" data-testid="dashboard-page">
@@ -57,7 +196,6 @@ export default function Dashboard() {
           </h1>
         </div>
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-white/10 mb-8 animate-fade-in stagger-1" data-testid="stats-grid">
           <div className="bg-background p-5">
             <p className="font-mono text-xs text-white/40 uppercase tracking-wider mb-1">XP</p>
@@ -79,7 +217,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* XP Progress */}
         <div className="border border-white/10 p-5 mb-8 animate-fade-in stagger-2" data-testid="xp-progress">
           <div className="flex justify-between items-center mb-3">
             <span className="font-mono text-xs text-white/40 uppercase tracking-wider">Level {level} Progress</span>
@@ -91,39 +228,18 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Daily Challenge */}
           <div className="border border-white/10 animate-fade-in stagger-3" data-testid="daily-challenge-card">
             <div className="border-b border-white/10 px-5 py-3 flex items-center gap-2">
               <Target size={16} weight="bold" className="text-white/60" />
               <span className="font-mono text-xs uppercase tracking-wider text-white/60">Daily Challenge</span>
             </div>
             {daily ? (
-              <div className="p-5">
-                <h3 className="font-mono font-bold text-lg mb-2">{daily.title}</h3>
-                <p className="text-sm text-white/50 font-light mb-4">{daily.description}</p>
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs text-white/40">+{daily.xp_reward} XP</span>
-                  {daily.completed ? (
-                    <span className="font-mono text-xs text-white/40 uppercase" data-testid="daily-completed-badge">Completed</span>
-                  ) : (
-                    <Button
-                      size="sm"
-                      className="bg-white text-black hover:bg-neutral-200 font-mono text-xs uppercase tracking-wider rounded-none"
-                      onClick={handleCompleteDaily}
-                      disabled={loadingDaily}
-                      data-testid="complete-daily-btn"
-                    >
-                      {loadingDaily ? "..." : "Complete"}
-                    </Button>
-                  )}
-                </div>
-              </div>
+              <DailyChallengeCard daily={daily} onComplete={handleCompleteDaily} />
             ) : (
-              <div className="p-5 text-white/30 font-mono text-sm">Loading...</div>
+              <div className="p-5 text-white/30 font-mono text-sm">No challenge today</div>
             )}
           </div>
 
-          {/* Recent Lessons */}
           <div className="border border-white/10 animate-fade-in stagger-4" data-testid="recent-lessons">
             <div className="border-b border-white/10 px-5 py-3 flex items-center justify-between">
               <div className="flex items-center gap-2">

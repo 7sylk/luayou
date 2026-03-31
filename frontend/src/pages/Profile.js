@@ -1,8 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import Header from "@/components/Header";
 import { useAuth } from "@/lib/AuthContext";
 import { userAPI } from "@/lib/api";
 import { Trophy, Lightning, Star, BookOpen, Target, Fire } from "@phosphor-icons/react";
+import { toast } from "sonner";
+import axios from "axios";
+
+const API = process.env.REACT_APP_BACKEND_URL || "http://localhost:8001";
 
 const BADGE_INFO = {
   first_lesson: { name: "First Steps", desc: "Complete your first lesson", icon: BookOpen },
@@ -19,12 +23,56 @@ const BADGE_INFO = {
 };
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [stats, setStats] = useState(null);
+  const [avatarSrc, setAvatarSrc] = useState(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     userAPI.stats().then((r) => setStats(r.data)).catch(() => {});
-  }, []);
+    // Load current avatar
+    if (user?.avatar && user.avatar !== "default") {
+      setAvatarSrc(user.avatar);
+    }
+  }, [user]);
+
+  const handleAvatarClick = () => fileInputRef.current?.click();
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+    if (file.size > 500_000) {
+      toast.error("Image must be under 500KB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const base64 = ev.target.result;
+      setUploadingAvatar(true);
+      try {
+        const token = localStorage.getItem("token");
+        await axios.post(
+          `${API}/api/user/avatar`,
+          { avatar: base64 },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setAvatarSrc(base64);
+        await refreshUser();
+        toast.success("Avatar updated");
+      } catch (e) {
+        toast.error(e.response?.data?.detail || "Upload failed");
+      }
+      setUploadingAvatar(false);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const xp = stats?.xp ?? user?.xp ?? 0;
   const level = stats?.level ?? user?.level ?? 1;
@@ -35,7 +83,9 @@ export default function Profile() {
   const perfectQuizzes = stats?.perfect_quizzes ?? 0;
   const nextLevelXp = stats?.xp_for_next_level || (level * level * 100);
   const prevLevelXp = ((level - 1) * (level - 1)) * 100;
-  const progressPct = nextLevelXp > prevLevelXp ? Math.min(100, ((xp - prevLevelXp) / (nextLevelXp - prevLevelXp)) * 100) : 0;
+  const progressPct = nextLevelXp > prevLevelXp
+    ? Math.min(100, ((xp - prevLevelXp) / (nextLevelXp - prevLevelXp)) * 100)
+    : 0;
 
   return (
     <div className="min-h-screen bg-background" data-testid="profile-page">
@@ -44,12 +94,44 @@ export default function Profile() {
         <div className="mb-10 animate-fade-in">
           <p className="font-mono text-xs tracking-[0.2em] uppercase text-white/40 mb-2">Profile</p>
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-white text-black flex items-center justify-center font-mono font-bold text-xl" data-testid="user-avatar">
-              {user?.username?.charAt(0)?.toUpperCase() || "?"}
+            {/* Avatar */}
+            <div className="relative group">
+              <button
+                onClick={handleAvatarClick}
+                disabled={uploadingAvatar}
+                className="w-14 h-14 overflow-hidden border border-white/10 hover:border-white/30 transition-colors relative"
+                data-testid="user-avatar"
+                title="Click to change avatar"
+              >
+                {avatarSrc ? (
+                  <img src={avatarSrc} alt="avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-white text-black flex items-center justify-center font-mono font-bold text-xl">
+                    {user?.username?.charAt(0)?.toUpperCase() || "?"}
+                  </div>
+                )}
+                {/* Hover overlay */}
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <span className="font-mono text-xs text-white">
+                    {uploadingAvatar ? "..." : "Edit"}
+                  </span>
+                </div>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarChange}
+              />
             </div>
+
             <div>
-              <h1 className="font-mono font-bold text-2xl tracking-tight" data-testid="profile-username">{user?.username}</h1>
+              <h1 className="font-mono font-bold text-2xl tracking-tight" data-testid="profile-username">
+                {user?.username}
+              </h1>
               <p className="text-sm text-white/40">{user?.email}</p>
+              <p className="font-mono text-xs text-white/20 mt-0.5">Click avatar to change</p>
             </div>
           </div>
         </div>
