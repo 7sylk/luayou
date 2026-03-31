@@ -75,3 +75,53 @@ async def get_stats(request: Request):
         "xp_for_next_level": xp_for_next_level(user.get("xp", 0)),
         "completed_lesson_ids": [p["lesson_id"] for p in progress],
     }
+
+
+@router.get("/progress")
+async def get_progress(request: Request):
+    user = await get_current_user(request, db)
+
+    lessons = await db.lessons.find({}, {"_id": 0}).sort("order_index", 1).to_list(100)
+    progress = await db.user_progress.find(
+        {"user_id": user["id"], "completed": True}, {"_id": 0}
+    ).to_list(100)
+    completed_ids = {p["lesson_id"] for p in progress}
+
+    total_xp_possible = sum(l.get("xp_reward", 0) for l in lessons)
+    earned_xp_from_lessons = sum(
+        l.get("xp_reward", 0) for l in lessons if l["id"] in completed_ids
+    )
+
+    lesson_map = []
+    for lesson in lessons:
+        lesson_map.append({
+            "id": lesson["id"],
+            "title": lesson["title"],
+            "difficulty": lesson["difficulty"],
+            "order_index": lesson["order_index"],
+            "xp_reward": lesson["xp_reward"],
+            "completed": lesson["id"] in completed_ids,
+        })
+
+    beginner = [l for l in lesson_map if l["difficulty"] == "beginner"]
+    intermediate = [l for l in lesson_map if l["difficulty"] == "intermediate"]
+    advanced = [l for l in lesson_map if l["difficulty"] == "advanced"]
+
+    return {
+        "total_lessons": len(lessons),
+        "completed_lessons": len(completed_ids),
+        "completion_pct": round(len(completed_ids) / len(lessons) * 100) if lessons else 0,
+        "total_xp_possible": total_xp_possible,
+        "earned_xp_from_lessons": earned_xp_from_lessons,
+        "current_xp": user.get("xp", 0),
+        "level": user.get("level", 1),
+        "streak": user.get("streak", 0),
+        "daily_completed": user.get("daily_completed", 0),
+        "perfect_quizzes": user.get("perfect_quizzes", 0),
+        "lesson_map": lesson_map,
+        "by_difficulty": {
+            "beginner": {"total": len(beginner), "completed": sum(1 for l in beginner if l["completed"])},
+            "intermediate": {"total": len(intermediate), "completed": sum(1 for l in intermediate if l["completed"])},
+            "advanced": {"total": len(advanced), "completed": sum(1 for l in advanced if l["completed"])},
+        },
+    }

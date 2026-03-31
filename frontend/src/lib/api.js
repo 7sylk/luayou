@@ -67,6 +67,7 @@ export const userAPI = {
   profile: () => api.get("/user/profile"),
   updateProfile: (data) => api.put("/user/profile", data),
   stats: () => api.get("/user/stats"),
+  progress: () => api.get("/user/progress"),
 };
 
 export function formatApiError(detail) {

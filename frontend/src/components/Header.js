@@ -6,6 +6,7 @@ import { SignOut, Lightning } from "@phosphor-icons/react";
 const NAV_ITEMS = [
   { path: "/dashboard", label: "Dashboard" },
   { path: "/lessons", label: "Lessons" },
+  { path: "/progress", label: "Progress" },
   { path: "/leaderboard", label: "Leaderboard" },
 ];
 
