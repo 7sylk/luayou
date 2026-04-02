@@ -27,6 +27,9 @@ export default function Profile() {
   const [stats, setStats] = useState(null);
   const [avatarSrc, setAvatarSrc] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [editingUsername, setEditingUsername] = useState(false);
+  const [username, setUsername] = useState("");
+  const [savingUsername, setSavingUsername] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -34,9 +37,30 @@ export default function Profile() {
     if (user?.avatar && user.avatar !== "default") {
       setAvatarSrc(user.avatar);
     }
+    setUsername(user?.username || "");
   }, [user]);
 
   const handleAvatarClick = () => fileInputRef.current?.click();
+
+  const handleUsernameSave = async () => {
+    const nextUsername = username.trim();
+    if (!nextUsername || nextUsername === user?.username) {
+      setEditingUsername(false);
+      setUsername(user?.username || "");
+      return;
+    }
+
+    setSavingUsername(true);
+    try {
+      await userAPI.updateProfile({ username: nextUsername });
+      await refreshUser();
+      toast.success("Username updated");
+      setEditingUsername(false);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Could not update username");
+    }
+    setSavingUsername(false);
+  };
 
   const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0];
@@ -124,9 +148,45 @@ export default function Profile() {
             </div>
 
             <div>
-              <h1 className="font-mono font-bold text-2xl tracking-tight" data-testid="profile-username">
-                {user?.username}
-              </h1>
+              {editingUsername ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    className="bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white outline-none focus:border-white/30"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    maxLength={32}
+                    autoFocus
+                  />
+                  <button
+                    className="font-mono text-xs text-white/40 hover:text-white"
+                    onClick={handleUsernameSave}
+                    disabled={savingUsername}
+                  >
+                    {savingUsername ? "..." : "Save"}
+                  </button>
+                  <button
+                    className="font-mono text-xs text-white/30 hover:text-white"
+                    onClick={() => {
+                      setEditingUsername(false);
+                      setUsername(user?.username || "");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <h1 className="font-mono font-bold text-2xl tracking-tight" data-testid="profile-username">
+                    {user?.username}
+                  </h1>
+                  <button
+                    className="font-mono text-xs text-white/30 hover:text-white"
+                    onClick={() => setEditingUsername(true)}
+                  >
+                    Edit
+                  </button>
+                </div>
+              )}
               <p className="text-sm text-white/40">{user?.email}</p>
               <p className="font-mono text-xs text-white/20 mt-0.5">Click avatar to change</p>
             </div>

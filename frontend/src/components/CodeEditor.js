@@ -4,13 +4,20 @@ import { Play, Eraser } from "@phosphor-icons/react";
 import { useLua } from "@/hooks/useLua";
 
 export default function CodeEditor({ lessonId, starterCode, expectedOutput, onOutputChange, onCodeChange, onSuccess }) {
-  const [code, setCode] = useState(starterCode || "");
+  const [code, setCode] = useState(() => {
+    if (lessonId) {
+      const saved = localStorage.getItem(`luayou_code_${lessonId}`);
+      if (saved) return saved;
+    }
+    return starterCode || "";
+  });
   const { runLua, output, error, success, running } = useLua();
   const textareaRef = useRef(null);
   const lineNumbersRef = useRef(null);
 
   useEffect(() => {
-    setCode(starterCode || "");
+    const saved = lessonId ? localStorage.getItem(`luayou_code_${lessonId}`) : null;
+    setCode(saved || starterCode || "");
   }, [starterCode, lessonId]);
 
   const lineCount = code.split("\n").length;
@@ -25,6 +32,9 @@ export default function CodeEditor({ lessonId, starterCode, expectedOutput, onOu
   const handleCodeChange = (val) => {
     setCode(val);
     onCodeChange?.(val);
+    if (lessonId) {
+      localStorage.setItem(`luayou_code_${lessonId}`, val);
+    }
   };
 
   const handleRun = async () => {
@@ -40,6 +50,9 @@ export default function CodeEditor({ lessonId, starterCode, expectedOutput, onOu
     setCode(starterCode || "");
     onCodeChange?.(starterCode || "");
     onOutputChange?.("", "");
+    if (lessonId) {
+      localStorage.removeItem(`luayou_code_${lessonId}`);
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -50,6 +63,9 @@ export default function CodeEditor({ lessonId, starterCode, expectedOutput, onOu
       const newCode = code.substring(0, start) + "  " + code.substring(end);
       setCode(newCode);
       onCodeChange?.(newCode);
+      if (lessonId) {
+        localStorage.setItem(`luayou_code_${lessonId}`, newCode);
+      }
       requestAnimationFrame(() => {
         e.target.selectionStart = e.target.selectionEnd = start + 2;
       });

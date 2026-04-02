@@ -1,0 +1,1251 @@
+frontend/src/pages/LessonDetail.js — adds auto-advance after completion:
+
+import { useState, useEffect, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import Header from "@/components/Header";
+import CodeEditor from "@/components/CodeEditor";
+import Quiz from "@/components/Quiz";
+import AiTutor from "@/components/AiTutor";
+import { lessonsAPI } from "@/lib/api";
+import { useAuth } from "@/lib/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft, ArrowRight, Check, ArrowFatRight } from "@phosphor-icons/react";
+import { toast } from "sonner";
+
+export default function LessonDetail() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { refreshUser } = useAuth();
+  const [lesson, setLesson] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [codeOutput, setCodeOutput] = useState("");
+  const [codeError, setCodeError] = useState("");
+  const [currentCode, setCurrentCode] = useState("");
+  const [completed, setCompleted] = useState(false);
+  const [justCompleted, setJustCompleted] = useState(false);
+  const [challengePassed, setChallengePassed] = useState(false);
+  const [activeTab, setActiveTab] = useState("lesson");
+  const [mobileView, setMobileView] = useState("lesson");
+  const [totalLessons, setTotalLessons] = useState(15);
+
+  const fetchLesson = useCallback(async () => {
+    try {
+      const res = await lessonsAPI.get(id);
+      setLesson(res.data);
+      setCurrentCode(res.data.challenge_starter_code || "");
+      setCompleted(res.data.completed);
+      setChallengePassed(false);
+      setJustCompleted(false);
+      setLoading(false);
+    } catch {
+      navigate("/lessons");
+    }
+  }, [id, navigate]);
+
+  useEffect(() => { fetchLesson(); }, [fetchLesson]);
+  useEffect(() => {
+    lessonsAPI.list()
+      .then((res) => setTotalLessons(Math.max(1, res.data?.length || 15)))
+      .catch(() => {});
+  }, []);
+
+  const handleComplete = async () => {
+    if (!challengePassed) {
+      toast.error("Pass the code challenge first.");
+      return;
+    }
+    try {
+      const res = await lessonsAPI.complete(id);
+      if (res.data.xp_earned > 0) {
+        toast.success(`+${res.data.xp_earned} XP! Lesson completed.`);
+        if (res.data.new_badges?.length > 0) {
+          toast.success(`New badge: ${res.data.new_badges.join(", ")}`);
+        }
+      }
+      setCompleted(true);
+      setJustCompleted(true);
+      await refreshUser();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Error");
+    }
+  };
+
+  if (loading || !lesson) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="flex items-center justify-center pt-32 font-mono text-sm text-white/30">
+          loading<span className="cursor-blink">_</span>
+        </div>
+      </div>
+    );
+  }
+
+  const lessonNum = lesson.order_index;
+  const prevId = lessonNum > 1 ? `lesson-${String(lessonNum - 1).padStart(2, "0")}` : null;
+  const nextId = lessonNum < totalLessons ? `lesson-${String(lessonNum + 1).padStart(2, "00")}` : null;
+  const isLastLesson = lessonNum >= totalLessons;
+
+  return (
+    <div className="min-h-screen bg-background" data-testid="lesson-detail-page">
+      <Header />
+      <main className="pt-14">
+        <div className="border-b border-white/10 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-none font-mono text-xs text-white/40 hover:text-white"
+              onClick={() => navigate("/lessons")}
+              data-testid="back-to-lessons-btn"
+            >
+              <ArrowLeft size={14} className="mr-1" /> Lessons
+            </Button>
+            <span className="text-white/10">|</span>
+            <span className="font-mono text-xs text-white/40 uppercase tracking-wider hidden sm:inline">
+              {lesson.difficulty}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1 lg:hidden">
+            <button
+              className={`font-mono text-xs px-3 py-1 border ${mobileView === "lesson" ? "border-white/30 text-white" : "border-white/10 text-white/30"}`}
+              onClick={() => setMobileView("lesson")}
+            >
+              Lesson
+            </button>
+            <button
+              className={`font-mono text-xs px-3 py-1 border ${mobileView === "editor" ? "border-white/30 text-white" : "border-white/10 text-white/30"}`}
+              onClick={() => setMobileView("editor")}
+            >
+              Editor
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {prevId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="rounded-none font-mono text-xs text-white/30 hover:text-white"
+                onClick={() => navigate(`/lessons/${prevId}`)}
+                data-testid="prev-lesson-btn"
+              >
+                <ArrowLeft size={12} />
+              </Button>
+            )}
+            <span className="font-mono text-xs text-white/20">{lessonNum}/{totalLessons}</span>
+            {nextId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="rounded-none font-mono text-xs text-white/30 hover:text-white"
+                onClick={() => navigate(`/lessons/${nextId}`)}
+                data-testid="next-lesson-btn"
+              >
+                <ArrowRight size={12} />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="lg:grid lg:grid-cols-2" style={{ height: "calc(100vh - 7rem)" }}>
+          <div className={`border-r border-white/10 overflow-y-auto h-full ${mobileView === "editor" ? "hidden lg:block" : "block"}`}>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="bg-transparent border-b border-white/10 rounded-none h-auto p-0 w-full grid grid-cols-3">
+                <TabsTrigger value="lesson" className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-white/5 data-[state=active]:text-white" data-testid="tab-lesson">
+                  Lesson
+                </TabsTrigger>
+                <TabsTrigger value="quiz" className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-white/5 data-[state=active]:text-white" data-testid="tab-quiz">
+                  Quiz
+                </TabsTrigger>
+                <TabsTrigger value="ai" className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-white/5 data-[state=active]:text-white" data-testid="tab-ai-tutor">
+                  AI Tutor
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="lesson" className="p-6 m-0">
+                <div className="mb-4 flex items-center justify-between">
+                  <h1 className="font-mono font-bold text-xl tracking-tight" data-testid="lesson-title">
+                    {lesson.title}
+                  </h1>
+                  {completed && (
+                    <span className="flex items-center gap-1 font-mono text-xs text-white/40 uppercase">
+                      <Check size={12} /> Done
+                    </span>
+                  )}
+                </div>
+
+                <div className="text-sm text-white/70 leading-relaxed whitespace-pre-line mb-6" data-testid="lesson-content">
+                  {lesson.content}
+                </div>
+
+                <div className="mb-6">
+                  <h3 className="font-mono font-bold text-xs uppercase tracking-wider text-white/40 mb-3">Code Examples</h3>
+                  <pre className="bg-secondary p-4 border border-white/10 font-mono text-sm text-white/80 leading-relaxed overflow-x-auto" data-testid="code-examples">
+                    {lesson.code_examples}
+                  </pre>
+                </div>
+
+                <div className="border-t border-white/10 pt-6">
+                  <h3 className="font-mono font-bold text-xs uppercase tracking-wider text-white/40 mb-3">Challenge</h3>
+                  <p className="text-sm text-white/60 mb-4" data-testid="challenge-description">
+                    {lesson.challenge_description}
+                  </p>
+                  <p className="font-mono text-xs text-white/30 mb-6">
+                    Expected output: <code className="text-white/50">{lesson.challenge_expected_output}</code>
+                  </p>
+
+                  {/* Just completed — show next lesson prompt */}
+                  {justCompleted && (
+                    <div className="border border-white/20 p-4 mb-4">
+                      <p className="font-mono text-xs text-white/60 mb-3 flex items-center gap-2">
+                        <Check size={12} /> Lesson complete!
+                      </p>
+                      {!isLastLesson ? (
+                        <div className="flex gap-2">
+                          <Button
+                            className="bg-white text-black hover:bg-neutral-200 font-mono text-xs uppercase tracking-wider rounded-none"
+                            onClick={() => navigate(`/lessons/${nextId}`)}
+                          >
+                            Next lesson <ArrowRight size={12} className="ml-1" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="font-mono text-xs text-white/40 hover:text-white rounded-none"
+                            onClick={() => navigate("/lessons")}
+                          >
+                            All lessons
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Button
+                            className="bg-white text-black hover:bg-neutral-200 font-mono text-xs uppercase tracking-wider rounded-none"
+                            onClick={() => navigate("/progress")}
+                          >
+                            View certificate
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="font-mono text-xs text-white/40 hover:text-white rounded-none"
+                            onClick={() => navigate("/dashboard")}
+                          >
+                            Dashboard
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {!completed && (
+                    <div>
+                      <Button
+                        className="mb-3 lg:hidden bg-white/10 text-white/60 hover:bg-white/20 font-mono text-xs uppercase tracking-wider rounded-none"
+                        onClick={() => setMobileView("editor")}
+                      >
+                        Open Editor
+                      </Button>
+
+                      {challengePassed ? (
+                        <Button
+                          className="block bg-white text-black hover:bg-neutral-200 font-mono text-xs uppercase tracking-wider rounded-none"
+                          onClick={handleComplete}
+                          data-testid="mark-complete-btn"
+                        >
+                          <Check size={12} className="mr-1 inline" />
+                          Mark as complete (+{lesson.xp_reward} XP)
+                        </Button>
+                      ) : (
+                        <div>
+                          <Button
+                            className="bg-white/10 text-white/30 font-mono text-xs uppercase tracking-wider rounded-none cursor-not-allowed"
+                            disabled
+                            data-testid="mark-complete-btn"
+                          >
+                            Pass the challenge to complete
+                          </Button>
+                          <p className="font-mono text-xs text-white/20 mt-2">
+                            Run your code until output matches
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="quiz" className="p-6 m-0">
+                <Quiz lessonId={id} />
+              </TabsContent>
+
+              <TabsContent value="ai" className="p-6 m-0">
+                <AiTutor code={currentCode} errorOutput={codeError || codeOutput} lessonId={id} />
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          <div className={`flex flex-col overflow-hidden h-full ${mobileView === "lesson" ? "hidden lg:flex" : "flex"}`}>
+            <CodeEditor
+              lessonId={id}
+              starterCode={lesson.challenge_starter_code}
+              expectedOutput={lesson.challenge_expected_output}
+              onOutputChange={(output, error) => {
+                setCodeOutput(output);
+                setCodeError(error || "");
+              }}
+              onCodeChange={(code) => {
+                setCurrentCode(code);
+                localStorage.setItem(`luayou_code_${id}`, code);
+              }}
+              onSuccess={() => {
+                setChallengePassed(true);
+                setMobileView("lesson");
+              }}
+            />
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+frontend/src/components/Header.js — adds mobile hamburger menu:
+
+import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/lib/AuthContext";
+import { Button } from "@/components/ui/button";
+import { SignOut, Lightning, List, X } from "@phosphor-icons/react";
+
+const NAV_ITEMS = [
+  { path: "/dashboard", label: "Dashboard" },
+  { path: "/lessons", label: "Lessons" },
+  { path: "/progress", label: "Progress" },
+  { path: "/leaderboard", label: "Leaderboard" },
+];
+
+export default function Header() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+    setMobileOpen(false);
+  };
+
+  const handleNav = (path) => {
+    navigate(path);
+    setMobileOpen(false);
+  };
+
+  const hasAvatar = user?.avatar && user.avatar !== "default";
+
+  return (
+    <>
+      <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-background/95 backdrop-blur-sm" data-testid="app-header">
+        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            <button
+              className="font-mono font-bold text-lg tracking-tight"
+              onClick={() => handleNav("/dashboard")}
+              data-testid="header-logo"
+            >
+              lua<span className="text-muted-foreground">you</span>
+            </button>
+            <nav className="hidden sm:flex items-center gap-1">
+              {NAV_ITEMS.map((item) => (
+                <Button
+                  key={item.path}
+                  variant="ghost"
+                  size="sm"
+                  className={`rounded-none font-mono text-xs uppercase tracking-wider ${
+                    location.pathname === item.path
+                      ? "text-white bg-white/5"
+                      : "text-white/40 hover:text-white hover:bg-white/5"
+                  }`}
+                  onClick={() => handleNav(item.path)}
+                  data-testid={`nav-${item.label.toLowerCase()}`}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {user && (
+              <>
+                <button
+                  className="hidden sm:flex items-center gap-2 font-mono text-xs text-white/50 hover:text-white transition-colors"
+                  onClick={() => handleNav("/profile")}
+                  data-testid="header-profile-btn"
+                >
+                  <Lightning size={14} weight="fill" />
+                  <span>{user.xp} XP</span>
+                  <span className="text-white/20">|</span>
+                  <span>Lv.{user.level}</span>
+                </button>
+                <div
+                  className="hidden sm:flex w-7 h-7 overflow-hidden border border-white/10 items-center justify-center font-mono text-xs font-bold cursor-pointer"
+                  onClick={() => handleNav("/profile")}
+                  data-testid="header-avatar"
+                >
+                  {hasAvatar ? (
+                    <img src={user.avatar} alt="avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="bg-white text-black w-full h-full flex items-center justify-center">
+                      {user.username?.charAt(0)?.toUpperCase() || "?"}
+                    </span>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="hidden sm:flex rounded-none text-white/30 hover:text-white hover:bg-white/5 p-1 h-auto"
+                  onClick={handleLogout}
+                  data-testid="header-logout-btn"
+                >
+                  <SignOut size={16} />
+                </Button>
+
+                {/* Mobile hamburger */}
+                <button
+                  className="sm:hidden text-white/40 hover:text-white p-1"
+                  onClick={() => setMobileOpen((o) => !o)}
+                >
+                  {mobileOpen ? <X size={20} /> : <List size={20} />}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Mobile menu overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 bg-background pt-14 sm:hidden">
+          <div className="flex flex-col p-6 gap-1">
+            {/* User info */}
+            <div className="flex items-center gap-3 mb-6 pb-6 border-b border-white/10">
+              <div
+                className="w-10 h-10 overflow-hidden border border-white/10 flex items-center justify-center font-mono text-sm font-bold cursor-pointer"
+                onClick={() => handleNav("/profile")}
+              >
+                {hasAvatar ? (
+                  <img src={user.avatar} alt="avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="bg-white text-black w-full h-full flex items-center justify-center">
+                    {user?.username?.charAt(0)?.toUpperCase() || "?"}
+                  </span>
+                )}
+              </div>
+              <div>
+                <p className="font-mono font-bold text-sm">{user?.username}</p>
+                <p className="font-mono text-xs text-white/40">{user?.xp} XP · Lv.{user?.level}</p>
+              </div>
+            </div>
+
+            {/* Nav links */}
+            {NAV_ITEMS.map((item) => (
+              <button
+                key={item.path}
+                className={`w-full text-left font-mono text-sm px-4 py-3 border transition-colors ${
+                  location.pathname === item.path
+                    ? "border-white/20 bg-white/5 text-white"
+                    : "border-transparent text-white/50 hover:text-white hover:bg-white/[0.02]"
+                }`}
+                onClick={() => handleNav(item.path)}
+              >
+                {item.label}
+              </button>
+            ))}
+
+            <button
+              className="w-full text-left font-mono text-sm px-4 py-3 border border-transparent text-white/50 hover:text-white hover:bg-white/[0.02]"
+              onClick={() => handleNav("/profile")}
+            >
+              Profile
+            </button>
+
+            <button
+              className="w-full text-left font-mono text-sm px-4 py-3 mt-4 border border-white/10 text-white/30 hover:text-white flex items-center gap-2"
+              onClick={handleLogout}
+            >
+              <SignOut size={14} /> Sign out
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+frontend/src/pages/Profile.js — adds username change + XP breakdown:
+
+import { useState, useRef, useEffect } from "react";
+import Header from "@/components/Header";
+import { useAuth } from "@/lib/AuthContext";
+import { userAPI } from "@/lib/api";
+import { Trophy, Lightning, Star, BookOpen, Target, Fire, Check, PencilSimple } from "@phosphor-icons/react";
+import { toast } from "sonner";
+import axios from "axios";
+
+const API = process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8001";
+
+const BADGE_INFO = {
+  first_lesson: { name: "First Steps", desc: "Complete your first lesson", icon: BookOpen },
+  five_lessons: { name: "Scholar", desc: "Complete 5 lessons", icon: BookOpen },
+  ten_lessons: { name: "Dedicated", desc: "Complete 10 lessons", icon: BookOpen },
+  streak_3: { name: "Consistent", desc: "3-day streak", icon: Fire },
+  streak_7: { name: "Week Warrior", desc: "7-day streak", icon: Fire },
+  streak_30: { name: "Unstoppable", desc: "30-day streak", icon: Fire },
+  xp_500: { name: "Rising Star", desc: "Earn 500 XP", icon: Star },
+  xp_1000: { name: "XP Hunter", desc: "Earn 1,000 XP", icon: Lightning },
+  xp_5000: { name: "XP Master", desc: "Earn 5,000 XP", icon: Lightning },
+  daily_5: { name: "Daily Devotee", desc: "Complete 5 daily challenges", icon: Target },
+  quiz_master: { name: "Quiz Master", desc: "Get 3 perfect quiz scores", icon: Trophy },
+};
+
+export default function Profile() {
+  const { user, refreshUser } = useAuth();
+  const [stats, setStats] = useState(null);
+  const [avatarSrc, setAvatarSrc] = useState(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [editingUsername, setEditingUsername] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
+  const [savingUsername, setSavingUsername] = useState(false);
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    userAPI.stats().then((r) => setStats(r.data)).catch(() => {});
+    if (user?.avatar && user.avatar !== "default") {
+      setAvatarSrc(user.avatar);
+    }
+  }, [user]);
+
+  const handleAvatarClick = () => fileInputRef.current?.click();
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("Please select an image file"); return; }
+    if (file.size > 500_000) { toast.error("Image must be under 500KB"); return; }
+
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const base64 = ev.target.result;
+      setUploadingAvatar(true);
+      try {
+        const token = localStorage.getItem("luayou_token");
+        await axios.post(
+          `${API}/api/user/avatar`,
+          { avatar: base64 },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setAvatarSrc(base64);
+        await refreshUser();
+        toast.success("Avatar updated");
+      } catch (e) {
+        toast.error(e.response?.data?.detail || "Upload failed");
+      }
+      setUploadingAvatar(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveUsername = async () => {
+    if (!newUsername.trim()) return;
+    setSavingUsername(true);
+    try {
+      await userAPI.updateProfile({ username: newUsername.trim() });
+      await refreshUser();
+      toast.success("Username updated");
+      setEditingUsername(false);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Failed to update username");
+    }
+    setSavingUsername(false);
+  };
+
+  const xp = stats?.xp ?? user?.xp ?? 0;
+  const level = stats?.level ?? user?.level ?? 1;
+  const streak = stats?.streak ?? user?.streak ?? 0;
+  const badges = stats?.badges ?? user?.badges ?? [];
+  const lessonsCompleted = stats?.lessons_completed ?? 0;
+  const dailyCompleted = stats?.daily_completed ?? 0;
+  const perfectQuizzes = stats?.perfect_quizzes ?? 0;
+  const nextLevelXp = stats?.xp_for_next_level || (level * level * 100);
+  const prevLevelXp = ((level - 1) * (level - 1)) * 100;
+  const progressPct = nextLevelXp > prevLevelXp
+    ? Math.min(100, ((xp - prevLevelXp) / (nextLevelXp - prevLevelXp)) * 100)
+    : 0;
+
+  // XP breakdown estimates
+  const xpFromLessons = lessonsCompleted * 75;
+  const xpFromDaily = dailyCompleted * 75;
+  const xpFromQuizzes = xp - xpFromLessons - xpFromDaily;
+
+  return (
+    <div className="min-h-screen bg-background" data-testid="profile-page">
+      <Header />
+      <main className="max-w-3xl mx-auto px-6 pt-20 pb-12">
+        <div className="mb-10 animate-fade-in">
+          <p className="font-mono text-xs tracking-[0.2em] uppercase text-white/40 mb-2">Profile</p>
+          <div className="flex items-center gap-4">
+            <div className="relative group">
+              <button
+                onClick={handleAvatarClick}
+                disabled={uploadingAvatar}
+                className="w-14 h-14 overflow-hidden border border-white/10 hover:border-white/30 transition-colors relative"
+                data-testid="user-avatar"
+                title="Click to change avatar"
+              >
+                {avatarSrc ? (
+                  <img src={avatarSrc} alt="avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-white text-black flex items-center justify-center font-mono font-bold text-xl">
+                    {user?.username?.charAt(0)?.toUpperCase() || "?"}
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <span className="font-mono text-xs text-white">{uploadingAvatar ? "..." : "Edit"}</span>
+                </div>
+              </button>
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+            </div>
+
+            <div className="flex-1">
+              {editingUsername ? (
+                <div className="flex items-center gap-2 mb-1">
+                  <input
+                    className="bg-white/5 border border-white/20 px-2 py-1 font-mono text-sm text-white outline-none focus:border-white/40"
+                    value={newUsername}
+                    onChange={(e) => setNewUsername(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSaveUsername()}
+                    autoFocus
+                    placeholder={user?.username}
+                  />
+                  <button
+                    onClick={handleSaveUsername}
+                    disabled={savingUsername}
+                    className="font-mono text-xs text-white/60 hover:text-white px-2 py-1 border border-white/20 hover:border-white/40"
+                  >
+                    {savingUsername ? "..." : "Save"}
+                  </button>
+                  <button
+                    onClick={() => setEditingUsername(false)}
+                    className="font-mono text-xs text-white/30 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 mb-1">
+                  <h1 className="font-mono font-bold text-2xl tracking-tight" data-testid="profile-username">
+                    {user?.username}
+                  </h1>
+                  <button
+                    onClick={() => { setNewUsername(user?.username || ""); setEditingUsername(true); }}
+                    className="text-white/20 hover:text-white/60 transition-colors"
+                    title="Edit username"
+                  >
+                    <PencilSimple size={14} />
+                  </button>
+                </div>
+              )}
+              <p className="text-sm text-white/40">{user?.email}</p>
+              <p className="font-mono text-xs text-white/20 mt-0.5">Click avatar to change photo</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Level Progress */}
+        <div className="border border-white/10 p-5 mb-6 animate-fade-in stagger-1" data-testid="level-progress">
+          <div className="flex justify-between items-center mb-3">
+            <span className="font-mono text-xs text-white/40 uppercase tracking-wider">Level {level}</span>
+            <span className="font-mono text-xs text-white/40">{xp} / {nextLevelXp} XP</span>
+          </div>
+          <div className="h-2 bg-white/5">
+            <div className="h-full bg-white xp-bar" style={{ width: `${progressPct}%` }} />
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-white/10 mb-6 animate-fade-in stagger-2" data-testid="profile-stats">
+          {[
+            { label: "Total XP", value: xp },
+            { label: "Level", value: level },
+            { label: "Streak", value: `${streak} days` },
+            { label: "Lessons", value: lessonsCompleted },
+            { label: "Daily Challenges", value: dailyCompleted },
+            { label: "Perfect Quizzes", value: perfectQuizzes },
+          ].map((s) => (
+            <div key={s.label} className="bg-background p-4">
+              <p className="font-mono text-xs text-white/40 uppercase tracking-wider mb-1">{s.label}</p>
+              <p className="font-mono font-bold text-lg">{s.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* XP Breakdown */}
+        <div className="border border-white/10 p-5 mb-8 animate-fade-in stagger-2">
+          <h3 className="font-mono text-xs uppercase tracking-wider text-white/40 mb-4">XP breakdown</h3>
+          {[
+            { label: "Lessons", value: xpFromLessons, pct: xp > 0 ? (xpFromLessons / xp) * 100 : 0 },
+            { label: "Daily challenges", value: xpFromDaily, pct: xp > 0 ? (xpFromDaily / xp) * 100 : 0 },
+            { label: "Quizzes", value: Math.max(0, xpFromQuizzes), pct: xp > 0 ? (Math.max(0, xpFromQuizzes) / xp) * 100 : 0 },
+          ].map((row) => (
+            <div key={row.label} className="mb-3">
+              <div className="flex justify-between mb-1">
+                <span className="font-mono text-xs text-white/50">{row.label}</span>
+                <span className="font-mono text-xs text-white/40">{row.value} XP</span>
+              </div>
+              <div className="h-1 bg-white/5">
+                <div className="h-full bg-white/40" style={{ width: `${row.pct}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Badges */}
+        <div className="animate-fade-in stagger-3" data-testid="badges-section">
+          <h2 className="font-mono font-bold text-lg tracking-tight mb-4">Badges</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {Object.entries(BADGE_INFO).map(([key, info]) => {
+              const earned = badges.includes(key);
+              const Icon = info.icon;
+              return (
+                <div
+                  key={key}
+                  className={`border p-4 flex items-center gap-3 ${earned ? "border-white/20 bg-white/[0.02]" : "border-white/5 opacity-30"}`}
+                  data-testid={`badge-${key}`}
+                >
+                  <div className={`w-8 h-8 flex items-center justify-center border ${earned ? "border-white bg-white text-black" : "border-white/10"}`}>
+                    <Icon size={14} weight={earned ? "bold" : "regular"} />
+                  </div>
+                  <div>
+                    <p className="font-mono text-sm font-bold">{info.name}</p>
+                    <p className="text-xs text-white/40">{info.desc}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+frontend/src/pages/Lessons.js — adds search/filter:
+
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import Header from "@/components/Header";
+import { lessonsAPI } from "@/lib/api";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Lock, Check, ArrowRight, MagnifyingGlass } from "@phosphor-icons/react";
+import { LessonsSkeleton } from "@/components/Skeleton";
+
+export default function Lessons() {
+  const [lessons, setLessons] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all"); // all | completed | incomplete
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    lessonsAPI.list()
+      .then((r) => setLessons(r.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const applyFilters = (list) => {
+    let result = list;
+    if (search.trim()) {
+      result = result.filter((l) => l.title.toLowerCase().includes(search.toLowerCase()));
+    }
+    if (filter === "completed") result = result.filter((l) => l.completed);
+    if (filter === "incomplete") result = result.filter((l) => !l.completed);
+    return result;
+  };
+
+  const beginner = applyFilters(lessons.filter((l) => l.difficulty === "beginner"));
+  const intermediate = applyFilters(lessons.filter((l) => l.difficulty === "intermediate"));
+  const advanced = applyFilters(lessons.filter((l) => l.difficulty === "advanced"));
+
+  const LessonCard = ({ lesson }) => (
+    <button
+      className={`w-full text-left border border-white/10 p-5 flex items-center justify-between group transition-colors ${
+        lesson.locked ? "opacity-40 cursor-not-allowed" : "hover:bg-white/[0.02] hover:border-white/20"
+      }`}
+      onClick={() => !lesson.locked && navigate(`/lessons/${lesson.id}`)}
+      disabled={lesson.locked}
+      data-testid={`lesson-card-${lesson.id}`}
+    >
+      <div className="flex items-center gap-4">
+        <div className={`w-8 h-8 flex items-center justify-center border ${
+          lesson.completed ? "border-white bg-white text-black" : lesson.locked ? "border-white/10" : "border-white/20"
+        }`}>
+          {lesson.completed ? (
+            <Check size={14} weight="bold" />
+          ) : lesson.locked ? (
+            <Lock size={14} weight="regular" />
+          ) : (
+            <span className="font-mono text-xs">{lesson.order_index}</span>
+          )}
+        </div>
+        <div>
+          <h3 className="font-mono font-bold text-sm">{lesson.title}</h3>
+          <p className="text-xs text-white/40 mt-0.5">+{lesson.xp_reward} XP</p>
+        </div>
+      </div>
+      {!lesson.locked && !lesson.completed && (
+        <ArrowRight size={16} className="text-white/20 group-hover:text-white/50 transition-colors" />
+      )}
+    </button>
+  );
+
+  const LessonList = ({ items }) => (
+    <div className="grid grid-cols-1 gap-2">
+      {items.length === 0 ? (
+        <p className="font-mono text-sm text-white/20 py-6 text-center">No lessons match your filter.</p>
+      ) : (
+        items.map((l) => <LessonCard key={l.id} lesson={l} />)
+      )}
+    </div>
+  );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <LessonsSkeleton />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background" data-testid="lessons-page">
+      <Header />
+      <main className="max-w-4xl mx-auto px-6 pt-20 pb-12">
+        <div className="mb-8 animate-fade-in">
+          <p className="font-mono text-xs tracking-[0.2em] uppercase text-white/40 mb-2">Curriculum</p>
+          <h1 className="font-mono font-black text-3xl sm:text-4xl tracking-tighter">Lessons</h1>
+          <p className="text-sm text-white/40 mt-2 font-light">
+            {lessons.filter((l) => l.completed).length} / {lessons.length} completed
+          </p>
+        </div>
+
+        {/* Search + filter */}
+        <div className="flex gap-2 mb-6 animate-fade-in">
+          <div className="flex-1 flex items-center gap-2 border border-white/10 px-3 py-2 focus-within:border-white/30 transition-colors">
+            <MagnifyingGlass size={14} className="text-white/30 flex-shrink-0" />
+            <input
+              className="flex-1 bg-transparent font-mono text-sm text-white placeholder-white/20 outline-none"
+              placeholder="Search lessons..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-1">
+            {[["all", "All"], ["completed", "Done"], ["incomplete", "Todo"]].map(([val, label]) => (
+              <button
+                key={val}
+                onClick={() => setFilter(val)}
+                className={`font-mono text-xs px-3 py-2 border transition-colors ${
+                  filter === val ? "border-white/30 text-white" : "border-white/10 text-white/30 hover:text-white/60"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <Tabs defaultValue="beginner" className="animate-fade-in stagger-1">
+          <TabsList className="bg-transparent border border-white/10 rounded-none h-auto p-0 w-full grid grid-cols-3">
+            <TabsTrigger value="beginner" className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-white data-[state=active]:text-black" data-testid="tab-beginner">
+              Beginner ({beginner.length})
+            </TabsTrigger>
+            <TabsTrigger value="intermediate" className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-white data-[state=active]:text-black" data-testid="tab-intermediate">
+              Intermediate ({intermediate.length})
+            </TabsTrigger>
+            <TabsTrigger value="advanced" className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-white data-[state=active]:text-black" data-testid="tab-advanced">
+              Advanced ({advanced.length})
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="beginner" className="mt-6"><LessonList items={beginner} /></TabsContent>
+          <TabsContent value="intermediate" className="mt-6"><LessonList items={intermediate} /></TabsContent>
+          <TabsContent value="advanced" className="mt-6"><LessonList items={advanced} /></TabsContent>
+        </Tabs>
+      </main>
+    </div>
+  );
+}
+
+frontend/src/pages/Landing.js — adds FAQ section:
+
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import AuthModal from "@/components/AuthModal";
+import { Terminal, Code, Trophy, Lightning, Brain, Target, Plus, Minus } from "@phosphor-icons/react";
+
+const FEATURES = [
+  { icon: Code, title: "Interactive Editor", desc: "Write and run real Lua code directly in your browser — powered by Fengari WebAssembly" },
+  { icon: Lightning, title: "XP & Levels", desc: "Earn XP, level up, and unlock new content as you progress through the curriculum" },
+  { icon: Brain, title: "AI Tutor", desc: "Get intelligent hints, explanations, and solutions powered by GPT" },
+  { icon: Trophy, title: "Leaderboard", desc: "Compete globally and climb the XP rankings" },
+  { icon: Target, title: "Daily Challenges", desc: "Fresh coding challenges every day to keep your streak alive" },
+  { icon: Terminal, title: "15 Lessons", desc: "Structured curriculum from beginner to advanced — tables, metatables, coroutines and more" },
+];
+
+const FAQ = [
+  { q: "Is LuaYou free?", a: "Yes, completely free. No credit card, no trial period." },
+  { q: "Do I need programming experience?", a: "No. The curriculum starts from absolute basics — your first lesson is just printing 'Hello, Lua!' to the screen." },
+  { q: "Does the code actually run?", a: "Yes. LuaYou uses Fengari, a Lua 5.3 interpreter compiled to WebAssembly, so your code runs for real in the browser — not a simulator." },
+  { q: "What is Lua used for?", a: "Lua is used in game development (Roblox, LÖVE, World of Warcraft addons), embedded systems, and as a scripting language inside larger applications. It's fast, lightweight, and easy to learn." },
+  { q: "How does the XP system work?", a: "You earn XP by completing lessons, passing quizzes, and finishing daily challenges. XP feeds into your level, which is calculated as the square root of your XP divided by 100." },
+  { q: "Can I reset my progress?", a: "Not currently — but you can re-do any lesson or challenge as many times as you like." },
+];
+
+function FaqItem({ q, a }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="border-b border-white/10">
+      <button
+        className="w-full text-left py-4 flex items-center justify-between gap-4 font-mono text-sm text-white/70 hover:text-white transition-colors"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span>{q}</span>
+        {open ? <Minus size={14} className="flex-shrink-0 text-white/30" /> : <Plus size={14} className="flex-shrink-0 text-white/30" />}
+      </button>
+      {open && (
+        <p className="text-sm text-white/40 font-light leading-relaxed pb-4">{a}</p>
+      )}
+    </div>
+  );
+}
+
+export default function Landing() {
+  const [authOpen, setAuthOpen] = useState(false);
+  const [authTab, setAuthTab] = useState("login");
+
+  const openLogin = () => { setAuthTab("login"); setAuthOpen(true); };
+  const openRegister = () => { setAuthTab("register"); setAuthOpen(true); };
+
+  return (
+    <div className="min-h-screen bg-background" data-testid="landing-page">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-background/95 backdrop-blur-sm">
+        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+          <span className="font-mono font-bold text-lg tracking-tight" data-testid="logo">
+            lua<span className="text-muted-foreground">you</span>
+          </span>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              className="font-mono text-xs uppercase tracking-wider text-white/70 hover:text-white hover:bg-white/5 rounded-none"
+              onClick={openLogin}
+              data-testid="nav-login-btn"
+            >
+              Log in
+            </Button>
+            <Button
+              className="bg-white text-black hover:bg-neutral-200 font-mono text-xs uppercase tracking-wider rounded-none px-5"
+              onClick={openRegister}
+              data-testid="nav-signup-btn"
+            >
+              Sign up
+            </Button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Hero */}
+      <section className="pt-32 pb-24 px-6">
+        <div className="max-w-4xl mx-auto">
+          <p className="font-mono text-xs tracking-[0.2em] uppercase text-white/40 mb-6">
+            Gamified Lua Programming
+          </p>
+          <h1 className="font-mono font-black text-4xl sm:text-5xl lg:text-6xl tracking-tighter leading-[1.05] mb-6">
+            Learn Lua.<br />
+            <span className="text-white/40">Level up.</span>
+          </h1>
+          <p className="text-base text-white/60 max-w-lg leading-relaxed mb-10 font-light">
+            Master Lua programming through interactive lessons, coding challenges,
+            and AI-powered tutoring. Earn XP, unlock levels, and compete on the leaderboard.
+          </p>
+          <div className="flex gap-3">
+            <Button
+              className="bg-white text-black hover:bg-neutral-200 font-mono text-sm uppercase tracking-wider rounded-none px-8 h-11"
+              onClick={openRegister}
+              data-testid="hero-get-started-btn"
+            >
+              Get started free
+            </Button>
+            <Button
+              variant="outline"
+              className="border-white/20 text-white hover:bg-white/5 font-mono text-sm uppercase tracking-wider rounded-none px-8 h-11"
+              onClick={openLogin}
+              data-testid="hero-login-btn"
+            >
+              Log in
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Terminal preview */}
+      <section className="px-6 pb-20">
+        <div className="max-w-4xl mx-auto border border-white/10">
+          <div className="border-b border-white/10 px-4 py-2 flex items-center gap-2">
+            <div className="w-2 h-2 bg-white/20" />
+            <div className="w-2 h-2 bg-white/20" />
+            <div className="w-2 h-2 bg-white/20" />
+            <span className="ml-3 font-mono text-xs text-white/30">main.lua</span>
+          </div>
+          <div className="p-6 font-mono text-sm leading-relaxed">
+            <div><span className="text-white/40">--</span> <span className="text-white/50">Welcome to LuaYou</span></div>
+            <div className="mt-2">
+              <span className="text-white/60 font-bold">local</span>{" "}
+              <span className="text-white">student</span>{" "}
+              <span className="text-white/40">=</span>{" "}
+              <span className="text-white/80">"you"</span>
+            </div>
+            <div>
+              <span className="text-white/60 font-bold">local</span>{" "}
+              <span className="text-white">level</span>{" "}
+              <span className="text-white/40">=</span>{" "}
+              <span className="text-white">1</span>
+            </div>
+            <div className="mt-2">
+              <span className="text-white/60 font-bold">print</span>
+              <span className="text-white/40">(</span>
+              <span className="text-white/80">"Hello, "</span>{" "}
+              <span className="text-white/40">..</span>{" "}
+              <span className="text-white">student</span>{" "}
+              <span className="text-white/40">..</span>{" "}
+              <span className="text-white/80">"!"</span>
+              <span className="text-white/40">)</span>
+            </div>
+            <div className="mt-4 border-t border-white/10 pt-3 text-white/30">
+              &gt; Hello, you!
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="px-6 pb-24">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="font-mono font-bold text-2xl sm:text-3xl tracking-tight mb-12">
+            Everything you need
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-white/10">
+            {FEATURES.map((f, i) => (
+              <div key={i} className="bg-background p-8 flex flex-col gap-4" data-testid={`feature-card-${i}`}>
+                <f.icon size={24} weight="regular" className="text-white/60" />
+                <h3 className="font-mono font-bold text-sm uppercase tracking-wider">{f.title}</h3>
+                <p className="text-sm text-white/50 font-light leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="px-6 pb-24">
+        <div className="max-w-2xl mx-auto">
+          <h2 className="font-mono font-bold text-2xl sm:text-3xl tracking-tight mb-8">
+            FAQ
+          </h2>
+          <div>
+            {FAQ.map((item, i) => <FaqItem key={i} q={item.q} a={item.a} />)}
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-white/10 px-6 py-8">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <span className="font-mono text-xs text-white/30">luayou — learn lua the fun way</span>
+          <Button
+            className="bg-white text-black hover:bg-neutral-200 font-mono text-xs uppercase tracking-wider rounded-none"
+            onClick={openRegister}
+          >
+            Get started free
+          </Button>
+        </div>
+      </footer>
+
+      <AuthModal open={authOpen} onOpenChange={setAuthOpen} defaultTab={authTab} />
+    </div>
+  );
+}
+
+frontend/src/components/CodeEditor.js — adds code save per lesson to localStorage:
+
+import { useState, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Play, Eraser } from "@phosphor-icons/react";
+import { useLua } from "@/hooks/useLua";
+
+export default function CodeEditor({ lessonId, starterCode, expectedOutput, onOutputChange, onCodeChange, onSuccess }) {
+  const [code, setCode] = useState(() => {
+    if (lessonId) {
+      const saved = localStorage.getItem(`luayou_code_${lessonId}`);
+      if (saved) return saved;
+    }
+    return starterCode || "";
+  });
+  const { runLua, output, error, success, running } = useLua();
+  const textareaRef = useRef(null);
+  const lineNumbersRef = useRef(null);
+
+  useEffect(() => {
+    const saved = lessonId ? localStorage.getItem(`luayou_code_${lessonId}`) : null;
+    setCode(saved || starterCode || "");
+  }, [starterCode, lessonId]);
+
+  const lineCount = code.split("\n").length;
+  const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1);
+
+  const syncScroll = () => {
+    if (lineNumbersRef.current && textareaRef.current) {
+      lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop;
+    }
+  };
+
+  const handleCodeChange = (val) => {
+    setCode(val);
+    onCodeChange?.(val);
+    if (lessonId) localStorage.setItem(`luayou_code_${lessonId}`, val);
+  };
+
+  const handleRun = async () => {
+    const expected = expectedOutput ?? null;
+    const result = await runLua(code, expected);
+    onOutputChange?.(result.output, result.error);
+    if (result.success === true && expected !== null) {
+      onSuccess?.();
+    }
+  };
+
+  const handleClear = () => {
+    setCode(starterCode || "");
+    onCodeChange?.(starterCode || "");
+    onOutputChange?.("", "");
+    if (lessonId) localStorage.removeItem(`luayou_code_${lessonId}`);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const start = e.target.selectionStart;
+      const end = e.target.selectionEnd;
+      const newCode = code.substring(0, start) + "  " + code.substring(end);
+      setCode(newCode);
+      onCodeChange?.(newCode);
+      if (lessonId) localStorage.setItem(`luayou_code_${lessonId}`, newCode);
+      requestAnimationFrame(() => {
+        e.target.selectionStart = e.target.selectionEnd = start + 2;
+      });
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      handleRun();
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full" data-testid="code-editor">
+      <div className="border-b border-white/10 px-4 py-2 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs text-white/30">editor.lua</span>
+          {success === true && <span className="font-mono text-xs text-white/50">[pass]</span>}
+          {success === false && <span className="font-mono text-xs text-white/30">[fail]</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-none font-mono text-xs text-white/30 hover:text-white h-7 px-2"
+            onClick={handleClear}
+            data-testid="code-clear-btn"
+          >
+            <Eraser size={14} className="mr-1" /> Clear
+          </Button>
+          <Button
+            size="sm"
+            className="bg-white text-black hover:bg-neutral-200 rounded-none font-mono text-xs uppercase tracking-wider h-7 px-4"
+            onClick={handleRun}
+            disabled={running}
+            data-testid="code-run-btn"
+          >
+            <Play size={12} weight="fill" className="mr-1" />
+            {running ? "..." : "Run"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-hidden flex">
+        <div
+          ref={lineNumbersRef}
+          className="bg-background border-r border-white/5 pt-4 pb-4 overflow-hidden select-none"
+          style={{ minWidth: "3rem" }}
+        >
+          {lineNumbers.map((n) => (
+            <div
+              key={n}
+              className="font-mono text-xs text-white/20 text-right pr-3 leading-6"
+              style={{ fontSize: "13px", lineHeight: "1.5rem" }}
+            >
+              {n}
+            </div>
+          ))}
+        </div>
+        <textarea
+          ref={textareaRef}
+          className="flex-1 p-4 bg-background font-mono text-sm text-white/80 resize-none outline-none leading-6"
+          style={{ fontSize: "13px", lineHeight: "1.5rem" }}
+          value={code}
+          onChange={(e) => handleCodeChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onScroll={syncScroll}
+          spellCheck={false}
+          placeholder="-- Write your Lua code here..."
+          data-testid="code-textarea"
+        />
+      </div>
+
+      <div className="border-t border-white/10" data-testid="code-output-panel">
+        <div className="px-4 py-2 border-b border-white/5 flex items-center gap-2">
+          <span className="font-mono text-xs text-white/30">output</span>
+          <span className="font-mono text-xs text-white/20 ml-auto">ctrl+enter to run</span>
+        </div>
+        <div className="p-4 min-h-[80px] max-h-[200px] overflow-y-auto">
+          {output && <div className="terminal-output text-white/70" data-testid="code-output">{output}</div>}
+          {error && <div className="terminal-output text-white/40" data-testid="code-error">{error}</div>}
+          {!output && !error && <span className="font-mono text-xs text-white/15">Run your code to see output here</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+That's 6 files covering everything on the list. Files to update/create:
+
+frontend/src/pages/LessonDetail.js — auto-advance after completion
+frontend/src/components/Header.js — mobile hamburger menu
+frontend/src/pages/Profile.js — username change + XP breakdown
+frontend/src/pages/Lessons.js — search + filter
+frontend/src/pages/Landing.js — FAQ section
+frontend/src/components/CodeEditor.js — code save per lesson
+
+The remaining items (streak freeze, share badges, light mode) are lower effort — let me know if you want those too after testing these.

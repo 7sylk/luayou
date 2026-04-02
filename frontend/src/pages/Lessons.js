@@ -3,12 +3,14 @@ import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import { lessonsAPI } from "@/lib/api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Lock, Check, ArrowRight } from "@phosphor-icons/react";
+import { Lock, Check, ArrowRight, MagnifyingGlass } from "@phosphor-icons/react";
 import { LessonsSkeleton } from "@/components/Skeleton";
 
 export default function Lessons() {
   const [lessons, setLessons] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -18,9 +20,24 @@ export default function Lessons() {
       .finally(() => setLoading(false));
   }, []);
 
-  const beginner = lessons.filter((l) => l.difficulty === "beginner");
-  const intermediate = lessons.filter((l) => l.difficulty === "intermediate");
-  const advanced = lessons.filter((l) => l.difficulty === "advanced");
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredLessons = lessons.filter((lesson) => {
+    const matchesSearch =
+      normalizedSearch === "" ||
+      lesson.title.toLowerCase().includes(normalizedSearch) ||
+      lesson.id.toLowerCase().includes(normalizedSearch);
+
+    const matchesFilter =
+      filter === "all" ||
+      (filter === "completed" && lesson.completed) ||
+      (filter === "incomplete" && !lesson.completed);
+
+    return matchesSearch && matchesFilter;
+  });
+
+  const beginner = filteredLessons.filter((l) => l.difficulty === "beginner");
+  const intermediate = filteredLessons.filter((l) => l.difficulty === "intermediate");
+  const advanced = filteredLessons.filter((l) => l.difficulty === "advanced");
 
   const LessonCard = ({ lesson }) => (
     <button
@@ -56,7 +73,11 @@ export default function Lessons() {
 
   const LessonList = ({ items }) => (
     <div className="grid grid-cols-1 gap-2">
-      {items.map((l) => <LessonCard key={l.id} lesson={l} />)}
+      {items.length === 0 ? (
+        <p className="font-mono text-sm text-white/20 py-6 text-center">No lessons match your filter.</p>
+      ) : (
+        items.map((l) => <LessonCard key={l.id} lesson={l} />)
+      )}
     </div>
   );
 
@@ -79,6 +100,33 @@ export default function Lessons() {
           <p className="text-sm text-white/40 mt-2 font-light">
             {lessons.filter((l) => l.completed).length} / {lessons.length} completed
           </p>
+        </div>
+
+        <div className="flex gap-2 mb-6 animate-fade-in">
+          <div className="flex-1 flex items-center gap-2 border border-white/10 px-3 py-2 focus-within:border-white/30 transition-colors">
+            <MagnifyingGlass size={14} className="text-white/30 flex-shrink-0" />
+            <input
+              className="flex-1 bg-transparent font-mono text-sm text-white placeholder-white/20 outline-none"
+              placeholder="Search lessons..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-1">
+            {[["all", "All"], ["completed", "Done"], ["incomplete", "Todo"]].map(([value, label]) => (
+              <button
+                key={value}
+                onClick={() => setFilter(value)}
+                className={`font-mono text-xs px-3 py-2 border transition-colors ${
+                  filter === value
+                    ? "border-white/30 text-white"
+                    : "border-white/10 text-white/30 hover:text-white/60"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <Tabs defaultValue="beginner" className="animate-fade-in stagger-1">

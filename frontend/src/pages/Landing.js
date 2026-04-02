@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import AuthModal from "@/components/AuthModal";
-import { Terminal, Code, Trophy, Lightning, Brain, Target } from "@phosphor-icons/react";
+import { Terminal, Code, Trophy, Lightning, Brain, Target, Plus, Minus } from "@phosphor-icons/react";
 
 const FEATURES = [
   { icon: Code, title: "Interactive Editor", desc: "Write and run Lua code directly in your browser" },
@@ -11,6 +11,38 @@ const FEATURES = [
   { icon: Target, title: "Daily Challenges", desc: "Fresh coding challenges every day" },
   { icon: Terminal, title: "15+ Lessons", desc: "Structured curriculum from beginner to advanced" },
 ];
+
+const FAQ = [
+  { q: "Is LuaYou free?", a: "Yes, completely free. No credit card, no trial period." },
+  { q: "Do I need programming experience?", a: "No. The curriculum starts from the basics and builds step by step." },
+  { q: "Does the code actually run?", a: "Yes. Your Lua code runs in the browser through the built-in runtime, not just a fake preview." },
+  { q: "What is Lua used for?", a: "Lua is used in games, embedded systems, scripting, and tools that need a lightweight language." },
+  { q: "How does the XP system work?", a: "You earn XP from lessons, quizzes, and daily challenges, which raises your level over time." },
+  { q: "Can I redo lessons?", a: "Yes. You can revisit lessons and practice code any time, even after completing them." },
+];
+
+function FaqItem({ q, a }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="border-b border-white/10">
+      <button
+        className="w-full text-left py-4 flex items-center justify-between gap-4 font-mono text-sm text-white/70 hover:text-white transition-colors"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span>{q}</span>
+        {open ? (
+          <Minus size={14} className="flex-shrink-0 text-white/30" />
+        ) : (
+          <Plus size={14} className="flex-shrink-0 text-white/30" />
+        )}
+      </button>
+      {open && (
+        <p className="text-sm text-white/40 font-light leading-relaxed pb-4">{a}</p>
+      )}
+    </div>
+  );
+}
 
 export default function Landing() {
   const [authOpen, setAuthOpen] = useState(false);
@@ -67,7 +99,7 @@ export default function Landing() {
               onClick={openRegister}
               data-testid="hero-get-started-btn"
             >
-              Get started
+              Get started free
             </Button>
             <Button
               variant="outline"
@@ -147,13 +179,29 @@ export default function Landing() {
         </div>
       </section>
 
+      <section className="px-6 pb-24">
+        <div className="max-w-2xl mx-auto">
+          <h2 className="font-mono font-bold text-2xl sm:text-3xl tracking-tight mb-8">
+            FAQ
+          </h2>
+          <div>
+            {FAQ.map((item, i) => <FaqItem key={i} q={item.q} a={item.a} />)}
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="border-t border-white/10 px-6 py-8">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <span className="font-mono text-xs text-white/30">
             luayou -- learn lua the fun way
           </span>
-          <span className="font-mono text-xs text-white/20">2026</span>
+          <Button
+            className="bg-white text-black hover:bg-neutral-200 font-mono text-xs uppercase tracking-wider rounded-none"
+            onClick={openRegister}
+          >
+            Get started free
+          </Button>
         </div>
       </footer>
 

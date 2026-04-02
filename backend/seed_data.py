@@ -39,6 +39,7 @@ async def seed_database(db):
     await db.lessons.create_index("id", unique=True)
     await db.lessons.create_index("order_index")
     await db.user_progress.create_index([("user_id", 1), ("lesson_id", 1)], unique=True)
+    await db.user_quiz_results.create_index([("user_id", 1), ("quiz_id", 1)], unique=True)
     await db.quizzes.create_index("lesson_id")
     await db.daily_challenges.create_index("date")
     await db.user_daily.create_index([("user_id", 1), ("date", 1)], unique=True)

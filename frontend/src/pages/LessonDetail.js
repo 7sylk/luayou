@@ -21,6 +21,7 @@ export default function LessonDetail() {
   const [codeError, setCodeError] = useState("");
   const [currentCode, setCurrentCode] = useState("");
   const [completed, setCompleted] = useState(false);
+  const [justCompleted, setJustCompleted] = useState(false);
   const [challengePassed, setChallengePassed] = useState(false);
   const [activeTab, setActiveTab] = useState("lesson");
   const [mobileView, setMobileView] = useState("lesson"); // lesson | editor
@@ -33,6 +34,7 @@ export default function LessonDetail() {
       setCurrentCode(res.data.challenge_starter_code || "");
       setCompleted(res.data.completed);
       setChallengePassed(false);
+      setJustCompleted(false);
       setLoading(false);
     } catch {
       navigate("/lessons");
@@ -61,6 +63,7 @@ export default function LessonDetail() {
         }
       }
       setCompleted(true);
+      setJustCompleted(true);
       await refreshUser();
     } catch (e) {
       toast.error(e.response?.data?.detail || "Error");
@@ -81,6 +84,7 @@ export default function LessonDetail() {
   const lessonNum = lesson.order_index;
   const prevId = lessonNum > 1 ? `lesson-${String(lessonNum - 1).padStart(2, "0")}` : null;
   const nextId = lessonNum < totalLessons ? `lesson-${String(lessonNum + 1).padStart(2, "0")}` : null;
+  const isLastLesson = lessonNum >= totalLessons;
 
   return (
     <div className="min-h-screen bg-background" data-testid="lesson-detail-page">
@@ -197,6 +201,47 @@ export default function LessonDetail() {
                   <p className="font-mono text-xs text-white/30 mb-6">
                     Expected output: <code className="text-white/50">{lesson.challenge_expected_output}</code>
                   </p>
+
+                  {justCompleted && (
+                    <div className="border border-white/20 p-4 mb-4">
+                      <p className="font-mono text-xs text-white/60 mb-3 flex items-center gap-2">
+                        <Check size={12} /> Lesson complete!
+                      </p>
+                      {!isLastLesson ? (
+                        <div className="flex gap-2">
+                          <Button
+                            className="bg-white text-black hover:bg-neutral-200 font-mono text-xs uppercase tracking-wider rounded-none"
+                            onClick={() => navigate(`/lessons/${nextId}`)}
+                          >
+                            Next lesson <ArrowRight size={12} className="ml-1" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="font-mono text-xs text-white/40 hover:text-white rounded-none"
+                            onClick={() => navigate("/lessons")}
+                          >
+                            All lessons
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Button
+                            className="bg-white text-black hover:bg-neutral-200 font-mono text-xs uppercase tracking-wider rounded-none"
+                            onClick={() => navigate("/progress")}
+                          >
+                            View progress
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="font-mono text-xs text-white/40 hover:text-white rounded-none"
+                            onClick={() => navigate("/dashboard")}
+                          >
+                            Dashboard
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {!completed && (
                     <div>
