@@ -4,24 +4,14 @@ const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 const api = axios.create({
   baseURL: `${API_URL}/api`,
-});
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("luayou_token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
+  withCredentials: true,
 });
 
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem("luayou_token");
-      if (window.location.pathname !== "/") {
-        window.location.href = "/";
-      }
+    if (error.response?.status === 401 && window.location.pathname !== "/") {
+      window.location.href = "/";
     }
     return Promise.reject(error);
   }
@@ -32,7 +22,12 @@ export default api;
 export const authAPI = {
   register: (data) => api.post("/auth/register", data),
   login: (data) => api.post("/auth/login", data),
+  logout: () => api.post("/auth/logout"),
   me: () => api.get("/auth/me"),
+  verifyEmail: (data) => api.post("/auth/verify-email", data),
+  resendVerification: (data) => api.post("/auth/resend-verification", data),
+  forgotPassword: (data) => api.post("/auth/forgot-password", data),
+  resetPassword: (data) => api.post("/auth/reset-password", data),
 };
 
 export const lessonsAPI = {
@@ -66,6 +61,7 @@ export const aiAPI = {
 export const userAPI = {
   profile: () => api.get("/user/profile"),
   updateProfile: (data) => api.put("/user/profile", data),
+  updateAvatar: (data) => api.post("/user/avatar", data),
   stats: () => api.get("/user/stats"),
   progress: () => api.get("/user/progress"),
 };

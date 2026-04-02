@@ -8,43 +8,36 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("luayou_token");
-    if (token) {
-      authAPI
-        .me()
-        .then((res) => setUser(res.data))
-        .catch(() => {
-          localStorage.removeItem("luayou_token");
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    authAPI
+      .me()
+      .then((res) => setUser(res.data))
+      .catch(() => {
+        setUser(null);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const login = async (email, password) => {
     const res = await authAPI.login({ email, password });
-    const { token, user: userData } = res.data;
-    localStorage.setItem("luayou_token", token);
+    const { user: userData } = res.data;
     setUser(userData);
     return userData;
   };
 
   const register = async (email, password, username) => {
-    const res = await authAPI.register({ email, password, username });
-    const { token, user: userData } = res.data;
-    localStorage.setItem("luayou_token", token);
-    setUser(userData);
-    return userData;
+    return authAPI.register({ email, password, username });
   };
 
-  const setSession = (token, userData) => {
-    localStorage.setItem("luayou_token", token);
+  const setSession = (_token, userData) => {
     setUser(userData);
   };
 
-  const logout = () => {
-    localStorage.removeItem("luayou_token");
+  const logout = async () => {
+    try {
+      await authAPI.logout();
+    } catch {
+      // ignore
+    }
     setUser(null);
   };
 
@@ -53,7 +46,7 @@ export function AuthProvider({ children }) {
       const res = await authAPI.me();
       setUser(res.data);
     } catch {
-      // ignore
+      setUser(null);
     }
   }, []);
 

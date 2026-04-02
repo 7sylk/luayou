@@ -1,23 +1,55 @@
+import base64
+import binascii
+import imghdr
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException, Request
-from models import UserResponse, ProfileUpdate, AdminUserUpdate
+
 from database import db
-from utils import get_current_user, xp_for_next_level, check_badges
-import os
+from models import AdminUserUpdate, ProfileUpdate, UserResponse
+from utils import get_current_user, require_admin, serialize_user, xp_for_next_level
 
 router = APIRouter(prefix="/api/user", tags=["user"])
+UPLOADS_DIR = Path(__file__).resolve().parents[1] / "uploads" / "avatars"
+MAX_AVATAR_BYTES = 500_000
+ALLOWED_IMAGE_TYPES = {"png", "jpeg", "gif", "webp"}
 
 
-def _require_admin(user: dict):
-    admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
-    user_email = user.get("email", "").strip().lower()
-    if not admin_email or user_email != admin_email:
-        raise HTTPException(status_code=403, detail="Admin access required")
+def _decode_avatar_data(avatar_data: str) -> tuple[str, bytes]:
+    if not avatar_data.startswith("data:image/") or ";base64," not in avatar_data:
+        raise HTTPException(status_code=400, detail="Invalid image format")
+
+    header, encoded = avatar_data.split(",", 1)
+    try:
+        raw_bytes = base64.b64decode(encoded, validate=True)
+    except (ValueError, binascii.Error):
+        raise HTTPException(status_code=400, detail="Invalid image data")
+
+    if len(raw_bytes) > MAX_AVATAR_BYTES:
+        raise HTTPException(status_code=400, detail="Image too large. Max 500KB.")
+
+    kind = imghdr.what(None, raw_bytes)
+    if kind not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Unsupported image type")
+
+    return ("jpg" if kind == "jpeg" else kind), raw_bytes
+
+
+def _remove_existing_avatar(avatar_path: str) -> None:
+    if not avatar_path.startswith("/uploads/avatars/"):
+        return
+    try:
+        target = (UPLOADS_DIR / Path(avatar_path).name).resolve()
+        if target.parent == UPLOADS_DIR.resolve() and target.exists():
+            target.unlink()
+    except OSError:
+        pass
 
 
 @router.get("/profile", response_model=UserResponse)
 async def get_profile(request: Request):
     user = await get_current_user(request, db)
-    return UserResponse(**user)
+    return UserResponse(**serialize_user(user, request))
 
 
 @router.put("/profile")
@@ -26,12 +58,15 @@ async def update_profile(data: ProfileUpdate, request: Request):
 
     update = {}
     if data.username:
+        username = data.username.strip()
+        if len(username) < 3:
+            raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
         existing = await db.users.find_one(
-            {"username": data.username, "id": {"$ne": user["id"]}}, {"_id": 0}
+            {"username": username, "id": {"$ne": user["id"]}}, {"_id": 0}
         )
         if existing:
             raise HTTPException(status_code=400, detail="Username already taken")
-        update["username"] = data.username
+        update["username"] = username
 
     if update:
         await db.users.update_one({"id": user["id"]}, {"$set": update})
@@ -39,7 +74,7 @@ async def update_profile(data: ProfileUpdate, request: Request):
     updated_user = await db.users.find_one(
         {"id": user["id"]}, {"_id": 0, "password_hash": 0}
     )
-    return UserResponse(**updated_user)
+    return UserResponse(**serialize_user(updated_user, request))
 
 
 @router.post("/avatar")
@@ -50,18 +85,27 @@ async def upload_avatar(data: dict, request: Request):
     if not avatar_data:
         raise HTTPException(status_code=400, detail="No avatar data provided")
 
-    if not avatar_data.startswith("data:image/"):
-        raise HTTPException(status_code=400, detail="Invalid image format")
+    extension, raw_bytes = _decode_avatar_data(avatar_data)
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-    if len(avatar_data) > 700_000:
-        raise HTTPException(status_code=400, detail="Image too large. Max 500KB.")
+    previous_avatar = user.get("avatar", "default")
+    filename = f"{user['id']}.{extension}"
+    target = (UPLOADS_DIR / filename).resolve()
+    if target.parent != UPLOADS_DIR.resolve():
+        raise HTTPException(status_code=400, detail="Invalid avatar path")
+
+    target.write_bytes(raw_bytes)
+    avatar_path = f"/uploads/avatars/{filename}"
+
+    if previous_avatar != avatar_path:
+        _remove_existing_avatar(previous_avatar)
 
     await db.users.update_one(
         {"id": user["id"]},
-        {"$set": {"avatar": avatar_data}}
+        {"$set": {"avatar": avatar_path}}
     )
 
-    return {"message": "Avatar updated"}
+    return {"message": "Avatar updated", "avatar": serialize_user({"avatar": avatar_path}, request)["avatar"]}
 
 
 @router.get("/stats")
@@ -138,27 +182,26 @@ async def get_progress(request: Request):
 @router.get("/admin/check")
 async def admin_check(request: Request):
     user = await get_current_user(request, db)
-    admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
-    return {"is_admin": bool(admin_email and user.get("email", "").strip().lower() == admin_email)}
+    return {"is_admin": user.get("role") == "admin"}
 
 
 @router.get("/admin/users")
 async def list_users_admin(request: Request):
     user = await get_current_user(request, db)
-    _require_admin(user)
+    require_admin(user)
 
     users = await db.users.find(
         {},
         {"_id": 0, "password_hash": 0},
-    ).to_list(1000)
+    ).to_list(500)
     users.sort(key=lambda u: u.get("created_at", ""), reverse=True)
-    return users
+    return [serialize_user(candidate, request) for candidate in users]
 
 
 @router.put("/admin/users/{user_id}")
 async def update_user_admin(user_id: str, data: AdminUserUpdate, request: Request):
     user = await get_current_user(request, db)
-    _require_admin(user)
+    require_admin(user)
 
     existing = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
     if not existing:
@@ -198,28 +241,27 @@ async def update_user_admin(user_id: str, data: AdminUserUpdate, request: Reques
         update["badges"] = [b.strip() for b in data.badges if isinstance(b, str) and b.strip()]
 
     if not update:
-        return existing
+        return serialize_user(existing, request)
 
     await db.users.update_one({"id": user_id}, {"$set": update})
     updated = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
-    return updated
+    return serialize_user(updated, request)
 
 
 @router.delete("/admin/users/{user_id}")
 async def delete_user_admin(user_id: str, request: Request):
     user = await get_current_user(request, db)
-    _require_admin(user)
+    require_admin(user)
 
     target = await db.users.find_one({"id": user_id}, {"_id": 0})
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
 
-    admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
-    if target.get("email", "").strip().lower() == admin_email:
+    if target.get("role") == "admin":
         raise HTTPException(status_code=400, detail="Cannot delete admin account")
 
+    _remove_existing_avatar(target.get("avatar", ""))
     await db.users.delete_one({"id": user_id})
     await db.user_progress.delete_many({"user_id": user_id})
     await db.user_daily.delete_many({"user_id": user_id})
     return {"message": "User deleted"}
-

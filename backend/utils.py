@@ -1,9 +1,14 @@
-import jwt
-import bcrypt
-import os
 import math
-from datetime import datetime, timezone, timedelta
-from fastapi import HTTPException
+import os
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
+import bcrypt
+import jwt
+from fastapi import HTTPException, Request, Response
+
+
+AUTH_COOKIE_NAME = "luayou_session"
 
 
 def get_jwt_secret():
@@ -37,11 +42,82 @@ def decode_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
-async def get_current_user(request, db):
+def auth_cookie_secure() -> bool:
+    return os.environ.get("AUTH_COOKIE_SECURE", "false").strip().lower() in ("1", "true", "yes")
+
+
+def auth_cookie_samesite() -> str:
+    raw = os.environ.get("AUTH_COOKIE_SAMESITE", "lax").strip().lower()
+    if raw not in {"lax", "strict", "none"}:
+        return "lax"
+    return raw
+
+
+def set_auth_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=AUTH_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=auth_cookie_secure(),
+        samesite=auth_cookie_samesite(),
+        max_age=7 * 24 * 60 * 60,
+        path="/",
+    )
+
+
+def clear_auth_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=AUTH_COOKIE_NAME,
+        httponly=True,
+        secure=auth_cookie_secure(),
+        samesite=auth_cookie_samesite(),
+        path="/",
+    )
+
+
+def _get_request_token(request: Request) -> str:
     auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    token = auth[7:]
+    if auth.startswith("Bearer "):
+        return auth[7:]
+
+    cookie_token = request.cookies.get(AUTH_COOKIE_NAME, "")
+    if cookie_token:
+        return cookie_token
+
+    raise HTTPException(status_code=401, detail="Not authenticated")
+
+
+def get_client_ip(request: Request) -> str:
+    forwarded_for = request.headers.get("x-forwarded-for", "")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
+def absolutize_avatar(request: Optional[Request], avatar: str) -> str:
+    if not avatar or avatar == "default" or "://" in avatar or not avatar.startswith("/"):
+        return avatar
+    if request is None:
+        return avatar
+    return str(request.base_url).rstrip("/") + avatar
+
+
+def serialize_user(user: dict, request: Optional[Request] = None) -> dict:
+    sanitized = {k: v for k, v in user.items() if k != "password_hash"}
+    sanitized["avatar"] = absolutize_avatar(request, sanitized.get("avatar", "default"))
+    sanitized["role"] = sanitized.get("role", "user")
+    return sanitized
+
+
+def require_admin(user: dict) -> None:
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+
+async def get_current_user(request: Request, db):
+    token = _get_request_token(request)
     payload = decode_token(token)
     user = await db.users.find_one(
         {"id": payload["sub"]}, {"_id": 0, "password_hash": 0}

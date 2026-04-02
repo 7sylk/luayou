@@ -26,12 +26,13 @@ class UserResponse(BaseModel):
     daily_completed: int = 0
     perfect_quizzes: int = 0
     email_verified: bool = True
+    role: str = "user"
     last_active: Optional[str] = None
     created_at: str
 
 
 class AuthResponse(BaseModel):
-    token: str
+    token: Optional[str] = None
     user: UserResponse
 
 

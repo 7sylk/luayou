@@ -46,6 +46,8 @@ async def seed_database(db):
     await db.daily_templates.create_index("id")
     await db.email_verifications.create_index("email", unique=True)
     await db.password_resets.create_index("email", unique=True)
+    await db.auth_rate_limits.create_index("key", unique=True)
+    await db.auth_rate_limits.create_index("expires_at", expireAfterSeconds=0)
 
     # Seed admin user
     from utils import hash_password
@@ -69,6 +71,7 @@ async def seed_database(db):
             "daily_completed": 2,
             "perfect_quizzes": 1,
             "email_verified": True,
+            "role": "admin",
             "last_active": now,
             "created_at": now,
         }
@@ -76,5 +79,5 @@ async def seed_database(db):
     else:
         await db.users.update_one(
             {"email": admin_email},
-            {"$set": {"email_verified": True}},
+            {"$set": {"email_verified": True, "role": "admin"}},
         )

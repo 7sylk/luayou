@@ -4,9 +4,6 @@ import { useAuth } from "@/lib/AuthContext";
 import { userAPI } from "@/lib/api";
 import { Trophy, Lightning, Star, BookOpen, Target, Fire } from "@phosphor-icons/react";
 import { toast } from "sonner";
-import axios from "axios";
-
-const API = process.env.REACT_APP_BACKEND_URL || "http://localhost:8001";
 
 const BADGE_INFO = {
   first_lesson: { name: "First Steps", desc: "Complete your first lesson", icon: BookOpen },
@@ -80,13 +77,8 @@ export default function Profile() {
       const base64 = ev.target.result;
       setUploadingAvatar(true);
       try {
-        const token = localStorage.getItem("luayou_token"); // fixed key
-        await axios.post(
-          `${API}/api/user/avatar`,
-          { avatar: base64 },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setAvatarSrc(base64);
+        const res = await userAPI.updateAvatar({ avatar: base64 });
+        setAvatarSrc(res.data?.avatar || base64);
         await refreshUser();
         toast.success("Avatar updated");
       } catch (e) {

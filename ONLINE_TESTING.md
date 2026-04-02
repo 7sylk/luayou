@@ -22,7 +22,7 @@ This repo is now set up so you can keep local development exactly as it is while
 2. In Render, create a new Web Service from the repo.
 3. If Render detects [render.yaml](/C:/Users/jantz/Documents/luayou/luayou/render.yaml), use that blueprint.
 4. In Render environment variables, fill in the real values from [backend/.env.example](/C:/Users/jantz/Documents/luayou/luayou/backend/.env.example):
-   `MONGO_URL`, `DB_NAME`, `JWT_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_USE_TLS`, `REQUIRE_EMAIL_VERIFICATION`
+   `MONGO_URL`, `DB_NAME`, `JWT_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_USE_TLS`, `REQUIRE_EMAIL_VERIFICATION`, `AUTH_COOKIE_SECURE`, `AUTH_COOKIE_SAMESITE`
 5. After deploy, copy the public backend URL.
 
 **Vercel Frontend Setup**
@@ -38,6 +38,7 @@ This repo is now set up so you can keep local development exactly as it is while
 2. Add it to `CORS_ORIGINS` in Render, for example:
    `https://your-frontend-domain.vercel.app`
 3. Redeploy the backend if needed.
+4. For cross-site auth cookies on Vercel + Render, set `AUTH_COOKIE_SECURE=true` and `AUTH_COOKIE_SAMESITE=none` in Render.
 
 **Important**
 - Do not upload your real local `.env` files.

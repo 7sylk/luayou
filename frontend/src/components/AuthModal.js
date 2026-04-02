@@ -1,10 +1,8 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/AuthContext";
+import { authAPI, formatApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import axios from "axios";
 import { toast } from "sonner";
-
-const API = process.env.REACT_APP_BACKEND_URL || "http://localhost:8001";
 
 export default function AuthModal({ open, onOpenChange, defaultTab }) {
   const { setSession } = useAuth();
@@ -30,11 +28,11 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
   const handleLogin = async () => {
     setLoading(true);
     try {
-      const res = await axios.post(`${API}/api/auth/login`, { email, password });
-      setSession(res.data.token, res.data.user);
+      const res = await authAPI.login({ email, password });
+      setSession(null, res.data.user);
       close();
     } catch (e) {
-      const detail = e.response?.data?.detail || "Login failed";
+      const detail = formatApiError(e.response?.data?.detail || "Login failed");
       if (
         e.response?.status === 403 &&
         typeof detail === "string" &&
@@ -53,12 +51,12 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
   const handleRegister = async () => {
     setLoading(true);
     try {
-      await axios.post(`${API}/api/auth/register`, { email, password, username });
-      toast.success("Account created. Check your email for a verification code.");
+      const res = await authAPI.register({ email, password, username });
+      toast.success(res.data?.message || "Account created successfully.");
       setShowVerifyEntry(true);
       setMode("verify");
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Registration failed");
+      toast.error(formatApiError(e.response?.data?.detail || "Registration failed"));
     }
     setLoading(false);
   };
@@ -66,13 +64,13 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
   const handleVerify = async () => {
     setLoading(true);
     try {
-      await axios.post(`${API}/api/auth/verify-email`, { email, code: verificationCode });
-      toast.success("Email verified. You can now sign in.");
+      const res = await authAPI.verifyEmail({ email, code: verificationCode });
+      toast.success(res.data?.message || "Email verified. You can now sign in.");
       setMode("login");
       setShowVerifyEntry(false);
       setVerificationCode("");
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Verification failed");
+      toast.error(formatApiError(e.response?.data?.detail || "Verification failed"));
     }
     setLoading(false);
   };
@@ -80,10 +78,10 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
   const handleResendVerification = async () => {
     setLoading(true);
     try {
-      await axios.post(`${API}/api/auth/resend-verification`, { email });
-      toast.success("Verification code sent if email exists.");
+      const res = await authAPI.resendVerification({ email });
+      toast.success(res.data?.message || "Verification code sent if email exists.");
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Failed to resend verification");
+      toast.error(formatApiError(e.response?.data?.detail || "Failed to resend verification"));
     }
     setLoading(false);
   };
@@ -91,11 +89,11 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
   const handleForgot = async () => {
     setLoading(true);
     try {
-      await axios.post(`${API}/api/auth/forgot-password`, { email });
-      toast.success("Reset code sent if email exists.");
+      const res = await authAPI.forgotPassword({ email });
+      toast.success(res.data?.message || "Reset code sent if email exists.");
       setMode("reset");
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Failed to send reset code");
+      toast.error(formatApiError(e.response?.data?.detail || "Failed to send reset code"));
     }
     setLoading(false);
   };
@@ -103,17 +101,17 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
   const handleReset = async () => {
     setLoading(true);
     try {
-      await axios.post(`${API}/api/auth/reset-password`, {
+      const res = await authAPI.resetPassword({
         token: resetToken,
         password: newPassword,
       });
-      toast.success("Password reset! Please log in.");
+      toast.success(res.data?.message || "Password reset! Please log in.");
       setMode("login");
       setPassword("");
       setResetToken("");
       setNewPassword("");
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Reset failed");
+      toast.error(formatApiError(e.response?.data?.detail || "Reset failed"));
     }
     setLoading(false);
   };
@@ -148,7 +146,7 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
             className="font-mono text-xs text-white/30 hover:text-white"
             data-testid="auth-modal-close"
           >
-            ✕
+            x
           </button>
         </div>
 
@@ -263,7 +261,7 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
           {mode === "verify" && (
             <>
               <p className="font-mono text-xs text-white/40">
-                Enter the 6-digit code sent to your email.
+                Enter the 8-digit code sent to your email.
               </p>
               <input
                 className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"
@@ -310,7 +308,7 @@ export default function AuthModal({ open, onOpenChange, defaultTab }) {
           {mode === "forgot" && (
             <>
               <p className="font-mono text-xs text-white/40">
-                Enter your email and we'll send a reset code.
+                Enter your email and we&apos;ll send a reset code.
               </p>
               <input
                 className="w-full bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white placeholder-white/20 outline-none focus:border-white/30"

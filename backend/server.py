@@ -8,6 +8,7 @@ load_dotenv(ROOT_DIR / ".env")
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import os
 import logging
 
@@ -40,13 +41,24 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="LuaYou API", lifespan=lifespan)
 
+uploads_dir = ROOT_DIR / "uploads"
+uploads_dir.mkdir(parents=True, exist_ok=True)
+
+cors_origins = [
+    origin.strip()
+    for origin in os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 app.include_router(auth_router)
 app.include_router(lessons_router)
