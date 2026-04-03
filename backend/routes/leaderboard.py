@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request
 from database import db
-from utils import get_current_user
+from utils import get_current_user, serialize_user
 
 router = APIRouter(prefix="/api/leaderboard", tags=["leaderboard"])
 
@@ -18,13 +18,15 @@ async def get_leaderboard(request: Request):
 
     result = []
     for i, u in enumerate(users):
+        serialized = serialize_user(u, request)
         result.append(
             {
                 "rank": i + 1,
-                "username": u.get("username", "Unknown"),
-                "xp": u.get("xp", 0),
-                "level": u.get("level", 1),
-                "avatar": u.get("avatar", "default"),
+                "id": serialized.get("id"),
+                "username": serialized.get("username", "Unknown"),
+                "xp": serialized.get("xp", 0),
+                "level": serialized.get("level", 1),
+                "avatar": serialized.get("avatar", "default"),
             }
         )
 

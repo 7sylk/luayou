@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Play, Eraser } from "@phosphor-icons/react";
 import { useLua } from "@/hooks/useLua";
+import { codeAPI } from "@/lib/api";
 
 export default function CodeEditor({ lessonId, starterCode, expectedOutput, onOutputChange, onCodeChange, onSuccess }) {
   const [code, setCode] = useState(() => {
@@ -39,10 +40,38 @@ export default function CodeEditor({ lessonId, starterCode, expectedOutput, onOu
 
   const handleRun = async () => {
     const expected = expectedOutput ?? null;
-    const result = await runLua(code, expected);
-    onOutputChange?.(result.output, result.error);
-    if (result.success === true && expected !== null) {
-      onSuccess?.();
+    const localResult = await runLua(code, expected);
+    let finalResult = {
+      ...localResult,
+      validation_message: null,
+      lesson_completed: false,
+      xp_earned: 0,
+      new_level: null,
+      new_badges: [],
+    };
+
+    if (lessonId) {
+      try {
+        const response = await codeAPI.run({
+          code,
+          lesson_id: lessonId,
+          output: localResult.output,
+          success: localResult.success,
+          error: localResult.error,
+        });
+        finalResult = { ...finalResult, ...response.data };
+      } catch (error) {
+        finalResult = {
+          ...finalResult,
+          success: false,
+          error: error.response?.data?.detail || "Validation failed",
+        };
+      }
+    }
+
+    onOutputChange?.(finalResult.output, finalResult.error, finalResult);
+    if (finalResult.success === true && expected !== null) {
+      onSuccess?.(finalResult);
     }
   };
 

@@ -61,9 +61,17 @@ export const aiAPI = {
 export const userAPI = {
   profile: () => api.get("/user/profile"),
   updateProfile: (data) => api.put("/user/profile", data),
+  updateSettings: (data) => api.put("/user/settings", data),
   updateAvatar: (data) => api.post("/user/avatar", data),
   stats: () => api.get("/user/stats"),
   progress: () => api.get("/user/progress"),
+  publicProfile: (username) => api.get(`/user/by-username/${encodeURIComponent(username)}`),
+  friends: () => api.get("/user/friends"),
+  friendRequests: () => api.get("/user/friend-requests"),
+  sendFriendRequest: (username) => api.post("/user/friend-requests", { username }),
+  acceptFriendRequest: (requestId) => api.post(`/user/friend-requests/${requestId}/accept`),
+  declineFriendRequest: (requestId) => api.post(`/user/friend-requests/${requestId}/decline`),
+  removeFriend: (username) => api.delete(`/user/friends/${encodeURIComponent(username)}`),
 };
 
 export const developerAPI = {

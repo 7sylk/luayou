@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import Header from "@/components/Header";
-import { leaderboardAPI } from "@/lib/api";
+import UserPreviewDialog from "@/components/UserPreviewDialog";
+import { leaderboardAPI, userAPI, formatApiError } from "@/lib/api";
 import { useAuth } from "@/lib/AuthContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Trophy } from "@phosphor-icons/react";
 import { Skeleton } from "@/components/Skeleton";
+import { toast } from "sonner";
 
 function LeaderboardSkeleton() {
   return (
@@ -32,13 +34,61 @@ export default function Leaderboard() {
   const { user } = useAuth();
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedProfile, setSelectedProfile] = useState(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [requests, setRequests] = useState({ incoming: [], outgoing: [] });
 
   useEffect(() => {
-    leaderboardAPI.get()
-      .then((r) => setEntries(r.data))
+    Promise.all([
+      leaderboardAPI.get(),
+      userAPI.friendRequests().catch(() => ({ data: { incoming: [], outgoing: [] } })),
+    ])
+      .then(([leaderboardRes, requestsRes]) => {
+        setEntries(leaderboardRes.data);
+        setRequests(requestsRes.data);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  const reloadRequests = async () => {
+    try {
+      const res = await userAPI.friendRequests();
+      setRequests(res.data);
+    } catch {
+      // ignore
+    }
+  };
+
+  const openPreview = async (username) => {
+    try {
+      const res = await userAPI.publicProfile(username);
+      setSelectedProfile(res.data);
+      setPreviewOpen(true);
+    } catch (error) {
+      toast.error(formatApiError(error.response?.data?.detail));
+    }
+  };
+
+  const incomingForSelected = requests.incoming?.find((item) => item.user.username === selectedProfile?.username);
+
+  const runAction = async (action) => {
+    if (!selectedProfile) return;
+    setPending(true);
+    try {
+      await action();
+      const [profileRes] = await Promise.all([
+        userAPI.publicProfile(selectedProfile.username),
+        reloadRequests(),
+      ]);
+      setSelectedProfile(profileRes.data);
+    } catch (error) {
+      toast.error(formatApiError(error.response?.data?.detail));
+    } finally {
+      setPending(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -52,6 +102,16 @@ export default function Leaderboard() {
   return (
     <div className="min-h-screen bg-background" data-testid="leaderboard-page">
       <Header />
+      <UserPreviewDialog
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        profile={selectedProfile}
+        pending={pending}
+        onAddFriend={(username) => runAction(() => userAPI.sendFriendRequest(username))}
+        onAcceptFriend={() => runAction(() => userAPI.acceptFriendRequest(incomingForSelected?.id))}
+        onDeclineFriend={() => runAction(() => userAPI.declineFriendRequest(incomingForSelected?.id))}
+        onRemoveFriend={(username) => runAction(() => userAPI.removeFriend(username))}
+      />
       <main className="max-w-3xl mx-auto px-6 pt-20 pb-12">
         <div className="mb-8 animate-fade-in">
           <p className="font-mono text-xs tracking-[0.2em] uppercase text-white/40 mb-2">Rankings</p>
@@ -81,8 +141,9 @@ export default function Leaderboard() {
                   return (
                     <TableRow
                       key={entry.rank}
-                      className={`border-white/5 ${isMe ? "bg-white/[0.03]" : "hover:bg-white/[0.02]"}`}
+                      className={`border-white/5 cursor-pointer ${isMe ? "bg-white/[0.03]" : "hover:bg-white/[0.02]"}`}
                       data-testid={`leaderboard-row-${entry.rank}`}
+                      onClick={() => openPreview(entry.username)}
                     >
                       <TableCell className="font-mono font-bold text-sm">
                         {entry.rank <= 3 ? (

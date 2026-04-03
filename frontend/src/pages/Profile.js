@@ -1,244 +1,85 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import Header from "@/components/Header";
 import { useAuth } from "@/lib/AuthContext";
 import { userAPI } from "@/lib/api";
-import { Trophy, Lightning, Star, BookOpen, Target, Fire } from "@phosphor-icons/react";
-import { toast } from "sonner";
-
-const BADGE_INFO = {
-  first_lesson: { name: "First Steps", desc: "Complete your first lesson", icon: BookOpen },
-  five_lessons: { name: "Scholar", desc: "Complete 5 lessons", icon: BookOpen },
-  ten_lessons: { name: "Dedicated", desc: "Complete 10 lessons", icon: BookOpen },
-  streak_3: { name: "Consistent", desc: "3-day streak", icon: Fire },
-  streak_7: { name: "Week Warrior", desc: "7-day streak", icon: Fire },
-  streak_30: { name: "Unstoppable", desc: "30-day streak", icon: Fire },
-  xp_500: { name: "Rising Star", desc: "Earn 500 XP", icon: Star },
-  xp_1000: { name: "XP Hunter", desc: "Earn 1,000 XP", icon: Lightning },
-  xp_5000: { name: "XP Master", desc: "Earn 5,000 XP", icon: Lightning },
-  daily_5: { name: "Daily Devotee", desc: "Complete 5 daily challenges", icon: Target },
-  quiz_master: { name: "Quiz Master", desc: "Get 3 perfect quiz scores", icon: Trophy },
-};
+import { Button } from "@/components/ui/button";
+import PublicProfileCard from "@/components/PublicProfileCard";
 
 export default function Profile() {
-  const { user, refreshUser } = useAuth();
+  const { user } = useAuth();
   const [stats, setStats] = useState(null);
-  const [avatarSrc, setAvatarSrc] = useState(null);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [editingUsername, setEditingUsername] = useState(false);
-  const [username, setUsername] = useState("");
-  const [savingUsername, setSavingUsername] = useState(false);
-  const fileInputRef = useRef(null);
+  const [friends, setFriends] = useState([]);
 
   useEffect(() => {
-    userAPI.stats().then((r) => setStats(r.data)).catch(() => {});
-    if (user?.avatar && user.avatar !== "default") {
-      setAvatarSrc(user.avatar);
-    }
-    setUsername(user?.username || "");
-  }, [user]);
+    userAPI.stats().then((res) => setStats(res.data)).catch(() => {});
+    userAPI.friends().then((res) => setFriends(res.data)).catch(() => {});
+  }, []);
 
-  const handleAvatarClick = () => fileInputRef.current?.click();
-
-  const handleUsernameSave = async () => {
-    const nextUsername = username.trim();
-    if (!nextUsername || nextUsername === user?.username) {
-      setEditingUsername(false);
-      setUsername(user?.username || "");
-      return;
-    }
-
-    setSavingUsername(true);
-    try {
-      await userAPI.updateProfile({ username: nextUsername });
-      await refreshUser();
-      toast.success("Username updated");
-      setEditingUsername(false);
-    } catch (e) {
-      toast.error(e.response?.data?.detail || "Could not update username");
-    }
-    setSavingUsername(false);
-  };
-
-  const handleAvatarChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select an image file");
-      return;
-    }
-    if (file.size > 500_000) {
-      toast.error("Image must be under 500KB");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const base64 = ev.target.result;
-      setUploadingAvatar(true);
-      try {
-        const res = await userAPI.updateAvatar({ avatar: base64 });
-        setAvatarSrc(res.data?.avatar || base64);
-        await refreshUser();
-        toast.success("Avatar updated");
-      } catch (e) {
-        toast.error(e.response?.data?.detail || "Upload failed");
+  const profile = user
+    ? {
+        ...user,
+        bio: user.bio || "",
+        is_me: true,
+        is_friend: false,
+        incoming_request: false,
+        outgoing_request: false,
       }
-      setUploadingAvatar(false);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const xp = stats?.xp ?? user?.xp ?? 0;
-  const level = stats?.level ?? user?.level ?? 1;
-  const streak = stats?.streak ?? user?.streak ?? 0;
-  const badges = stats?.badges ?? user?.badges ?? [];
-  const lessonsCompleted = stats?.lessons_completed ?? 0;
-  const dailyCompleted = stats?.daily_completed ?? 0;
-  const perfectQuizzes = stats?.perfect_quizzes ?? 0;
-  const nextLevelXp = stats?.xp_for_next_level || (level * level * 100);
-  const prevLevelXp = ((level - 1) * (level - 1)) * 100;
-  const progressPct = nextLevelXp > prevLevelXp
-    ? Math.min(100, ((xp - prevLevelXp) / (nextLevelXp - prevLevelXp)) * 100)
-    : 0;
+    : null;
 
   return (
-    <div className="min-h-screen bg-background" data-testid="profile-page">
+    <div className="min-h-screen bg-background text-white">
       <Header />
-      <main className="max-w-3xl mx-auto px-6 pt-20 pb-12">
-        <div className="mb-10 animate-fade-in">
-          <p className="font-mono text-xs tracking-[0.2em] uppercase text-white/40 mb-2">Profile</p>
-          <div className="flex items-center gap-4">
-            <div className="relative group">
-              <button
-                onClick={handleAvatarClick}
-                disabled={uploadingAvatar}
-                className="w-14 h-14 overflow-hidden border border-white/10 hover:border-white/30 transition-colors relative"
-                data-testid="user-avatar"
-                title="Click to change avatar"
-              >
-                {avatarSrc ? (
-                  <img src={avatarSrc} alt="avatar" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full bg-white text-black flex items-center justify-center font-mono font-bold text-xl">
-                    {user?.username?.charAt(0)?.toUpperCase() || "?"}
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <span className="font-mono text-xs text-white">
-                    {uploadingAvatar ? "..." : "Edit"}
-                  </span>
-                </div>
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleAvatarChange}
-              />
-            </div>
-
-            <div>
-              {editingUsername ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    className="bg-white/5 border border-white/10 px-3 py-2 font-mono text-sm text-white outline-none focus:border-white/30"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    maxLength={32}
-                    autoFocus
-                  />
-                  <button
-                    className="font-mono text-xs text-white/40 hover:text-white"
-                    onClick={handleUsernameSave}
-                    disabled={savingUsername}
-                  >
-                    {savingUsername ? "..." : "Save"}
-                  </button>
-                  <button
-                    className="font-mono text-xs text-white/30 hover:text-white"
-                    onClick={() => {
-                      setEditingUsername(false);
-                      setUsername(user?.username || "");
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <h1 className="font-mono font-bold text-2xl tracking-tight" data-testid="profile-username">
-                    {user?.username}
-                  </h1>
-                  <button
-                    className="font-mono text-xs text-white/30 hover:text-white"
-                    onClick={() => setEditingUsername(true)}
-                  >
-                    Edit
-                  </button>
-                </div>
-              )}
-              <p className="text-sm text-white/40">{user?.email}</p>
-              <p className="font-mono text-xs text-white/20 mt-0.5">Click avatar to change</p>
-            </div>
+      <main className="mx-auto max-w-4xl px-6 pb-12 pt-20">
+        <div className="mb-8 flex items-center justify-between gap-4">
+          <div>
+            <p className="mb-2 font-mono text-xs uppercase tracking-[0.2em] text-white/35">Profile</p>
+            <h1 className="font-mono text-3xl font-bold tracking-tight">Your profile</h1>
           </div>
+          <Button asChild variant="outline" className="rounded-none border-white/15 bg-transparent text-white hover:bg-white/5">
+            <Link to="/settings">Open settings</Link>
+          </Button>
         </div>
 
-        <div className="border border-white/10 p-5 mb-6 animate-fade-in stagger-1" data-testid="level-progress">
-          <div className="flex justify-between items-center mb-3">
-            <span className="font-mono text-xs text-white/40 uppercase tracking-wider">Level {level}</span>
-            <span className="font-mono text-xs text-white/40">{xp} / {nextLevelXp} XP</span>
-          </div>
-          <div className="h-2 bg-white/5">
-            <div className="h-full bg-white xp-bar" style={{ width: `${progressPct}%` }} />
-          </div>
-        </div>
+        {profile && (
+          <PublicProfileCard profile={{ ...profile, ...stats }} />
+        )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-white/10 mb-8 animate-fade-in stagger-2" data-testid="profile-stats">
-          {[
-            { label: "Total XP", value: xp },
-            { label: "Level", value: level },
-            { label: "Streak", value: `${streak} days` },
-            { label: "Lessons", value: lessonsCompleted },
-            { label: "Daily Challenges", value: dailyCompleted },
-            { label: "Perfect Quizzes", value: perfectQuizzes },
-          ].map((s) => (
-            <div key={s.label} className="bg-background p-4">
-              <p className="font-mono text-xs text-white/40 uppercase tracking-wider mb-1">{s.label}</p>
-              <p className="font-mono font-bold text-lg">{s.value}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="animate-fade-in stagger-3" data-testid="badges-section">
-          <h2 className="font-mono font-bold text-lg tracking-tight mb-4">Badges</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {Object.entries(BADGE_INFO).map(([key, info]) => {
-              const earned = badges.includes(key);
-              const Icon = info.icon;
-              return (
-                <div
-                  key={key}
-                  className={`border p-4 flex items-center gap-3 ${
-                    earned ? "border-white/20 bg-white/[0.02]" : "border-white/5 opacity-30"
-                  }`}
-                  data-testid={`badge-${key}`}
+        <section className="mt-6 border border-white/10 bg-white/[0.02] p-6">
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <h2 className="font-mono text-lg font-bold tracking-tight">Friends</h2>
+            <span className="font-mono text-xs uppercase tracking-[0.18em] text-white/35">{friends.length} total</span>
+          </div>
+          {friends.length ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {friends.map((friend) => (
+                <Link
+                  key={friend.id}
+                  to={`/${friend.username}`}
+                  className="border border-white/10 p-4 transition-colors hover:border-white/20 hover:bg-white/[0.02]"
                 >
-                  <div className={`w-8 h-8 flex items-center justify-center border ${
-                    earned ? "border-white bg-white text-black" : "border-white/10"
-                  }`}>
-                    <Icon size={14} weight={earned ? "bold" : "regular"} />
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 overflow-hidden border border-white/10 bg-white/5">
+                      {friend.avatar && friend.avatar !== "default" ? (
+                        <img src={friend.avatar} alt={`${friend.username} avatar`} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-white font-mono font-bold text-black">
+                          {friend.username?.charAt(0)?.toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-mono text-sm text-white">{friend.username}</p>
+                      <p className="text-xs text-white/45">Level {friend.level} · {friend.xp.toLocaleString()} XP</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-mono text-sm font-bold">{info.name}</p>
-                    <p className="text-xs text-white/40">{info.desc}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-white/40">No friends yet. You can add people from the leaderboard or their public profile.</p>
+          )}
+        </section>
       </main>
     </div>
   );

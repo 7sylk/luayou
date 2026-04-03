@@ -1,85 +1,35 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
-import { lessonsAPI } from "@/lib/api";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Lock, Check, ArrowRight, MagnifyingGlass } from "@phosphor-icons/react";
+import LearningPath from "@/components/LearningPath";
 import { LessonsSkeleton } from "@/components/Skeleton";
+import { lessonsAPI } from "@/lib/api";
 
 export default function Lessons() {
   const [lessons, setLessons] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [selectedLessonId, setSelectedLessonId] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    lessonsAPI.list()
+    lessonsAPI
+      .list()
       .then((r) => setLessons(r.data))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  const normalizedSearch = search.trim().toLowerCase();
-  const filteredLessons = lessons.filter((lesson) => {
-    const matchesSearch =
-      normalizedSearch === "" ||
-      lesson.title.toLowerCase().includes(normalizedSearch) ||
-      lesson.id.toLowerCase().includes(normalizedSearch);
+  useEffect(() => {
+    if (!lessons.length) return;
+    const fallback = lessons.find((lesson) => !lesson.locked) || lessons[0];
+    setSelectedLessonId((current) => current || fallback?.id || null);
+  }, [lessons]);
 
-    const matchesFilter =
-      filter === "all" ||
-      (filter === "completed" && lesson.completed) ||
-      (filter === "incomplete" && !lesson.completed);
-
-    return matchesSearch && matchesFilter;
-  });
-
-  const beginner = filteredLessons.filter((l) => l.difficulty === "beginner");
-  const intermediate = filteredLessons.filter((l) => l.difficulty === "intermediate");
-  const advanced = filteredLessons.filter((l) => l.difficulty === "advanced");
-
-  const LessonCard = ({ lesson }) => (
-    <button
-      className={`w-full text-left border border-white/10 p-5 flex items-center justify-between group transition-colors ${
-        lesson.locked ? "opacity-40 cursor-not-allowed" : "hover:bg-white/[0.02] hover:border-white/20"
-      }`}
-      onClick={() => !lesson.locked && navigate(`/lessons/${lesson.id}`)}
-      disabled={lesson.locked}
-      data-testid={`lesson-card-${lesson.id}`}
-    >
-      <div className="flex items-center gap-4">
-        <div className={`w-8 h-8 flex items-center justify-center border ${
-          lesson.completed ? "border-white bg-white text-black" : lesson.locked ? "border-white/10" : "border-white/20"
-        }`}>
-          {lesson.completed ? (
-            <Check size={14} weight="bold" />
-          ) : lesson.locked ? (
-            <Lock size={14} weight="regular" />
-          ) : (
-            <span className="font-mono text-xs">{lesson.order_index}</span>
-          )}
-        </div>
-        <div>
-          <h3 className="font-mono font-bold text-sm">{lesson.title}</h3>
-          <p className="text-xs text-white/40 mt-0.5">+{lesson.xp_reward} XP</p>
-        </div>
-      </div>
-      {!lesson.locked && !lesson.completed && (
-        <ArrowRight size={16} className="text-white/20 group-hover:text-white/50 transition-colors" />
-      )}
-    </button>
-  );
-
-  const LessonList = ({ items }) => (
-    <div className="grid grid-cols-1 gap-2">
-      {items.length === 0 ? (
-        <p className="font-mono text-sm text-white/20 py-6 text-center">No lessons match your filter.</p>
-      ) : (
-        items.map((l) => <LessonCard key={l.id} lesson={l} />)
-      )}
-    </div>
-  );
+  const stats = useMemo(() => {
+    const completed = lessons.filter((lesson) => lesson.completed).length;
+    const ready = lessons.filter((lesson) => !lesson.locked && !lesson.completed).length;
+    return { completed, ready, total: lessons.length };
+  }, [lessons]);
 
   if (loading) {
     return (
@@ -93,64 +43,35 @@ export default function Lessons() {
   return (
     <div className="min-h-screen bg-background" data-testid="lessons-page">
       <Header />
-      <main className="max-w-4xl mx-auto px-6 pt-20 pb-12">
+      <main className="mx-auto max-w-6xl px-4 pb-16 pt-20 sm:px-6">
         <div className="mb-8 animate-fade-in">
-          <p className="font-mono text-xs tracking-[0.2em] uppercase text-white/40 mb-2">Curriculum</p>
-          <h1 className="font-mono font-black text-3xl sm:text-4xl tracking-tighter">Lessons</h1>
-          <p className="text-sm text-white/40 mt-2 font-light">
-            {lessons.filter((l) => l.completed).length} / {lessons.length} completed
-          </p>
-        </div>
-
-        <div className="flex gap-2 mb-6 animate-fade-in">
-          <div className="flex-1 flex items-center gap-2 border border-white/10 px-3 py-2 focus-within:border-white/30 transition-colors">
-            <MagnifyingGlass size={14} className="text-white/30 flex-shrink-0" />
-            <input
-              className="flex-1 bg-transparent font-mono text-sm text-white placeholder-white/20 outline-none"
-              placeholder="Search lessons..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <div className="flex gap-1">
-            {[["all", "All"], ["completed", "Done"], ["incomplete", "Todo"]].map(([value, label]) => (
-              <button
-                key={value}
-                onClick={() => setFilter(value)}
-                className={`font-mono text-xs px-3 py-2 border transition-colors ${
-                  filter === value
-                    ? "border-white/30 text-white"
-                    : "border-white/10 text-white/30 hover:text-white/60"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h1 className="font-mono text-3xl font-black tracking-tight sm:text-4xl">Lessons</h1>
+            </div>
+            <div className="grid grid-cols-3 gap-2 sm:min-w-[360px]">
+              <div className="border border-white/10 bg-white/[0.02] px-4 py-3">
+                <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-white/35">Completed</p>
+                <p className="mt-2 font-mono text-2xl font-black">{stats.completed}</p>
+              </div>
+              <div className="border border-white/10 bg-white/[0.02] px-4 py-3">
+                <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-white/35">Ready now</p>
+                <p className="mt-2 font-mono text-2xl font-black">{stats.ready}</p>
+              </div>
+              <div className="border border-white/10 bg-white/[0.02] px-4 py-3">
+                <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-white/35">Total</p>
+                <p className="mt-2 font-mono text-2xl font-black">{stats.total}</p>
+              </div>
+            </div>
           </div>
         </div>
 
-        <Tabs defaultValue="beginner" className="animate-fade-in stagger-1">
-          <TabsList className="bg-transparent border border-white/10 rounded-none h-auto p-0 w-full grid grid-cols-3">
-            <TabsTrigger value="beginner" className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-white data-[state=active]:text-black" data-testid="tab-beginner">
-              Beginner ({beginner.length})
-            </TabsTrigger>
-            <TabsTrigger value="intermediate" className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-white data-[state=active]:text-black" data-testid="tab-intermediate">
-              Intermediate ({intermediate.length})
-            </TabsTrigger>
-            <TabsTrigger value="advanced" className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-white data-[state=active]:text-black" data-testid="tab-advanced">
-              Advanced ({advanced.length})
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="beginner" className="mt-6">
-            <LessonList items={beginner} />
-          </TabsContent>
-          <TabsContent value="intermediate" className="mt-6">
-            <LessonList items={intermediate} />
-          </TabsContent>
-          <TabsContent value="advanced" className="mt-6">
-            <LessonList items={advanced} />
-          </TabsContent>
-        </Tabs>
+        <LearningPath
+          lessons={lessons}
+          selectedLessonId={selectedLessonId}
+          onSelectLesson={(lesson) => setSelectedLessonId(lesson.id)}
+          onStartLesson={(lesson) => navigate(`/lessons/${lesson.id}`)}
+        />
       </main>
     </div>
   );

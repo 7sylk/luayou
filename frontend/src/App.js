@@ -7,6 +7,8 @@ import Dashboard from "@/pages/Dashboard";
 import Lessons from "@/pages/Lessons";
 import LessonDetail from "@/pages/LessonDetail";
 import Profile from "@/pages/Profile";
+import PublicProfile from "@/pages/PublicProfile";
+import Settings from "@/pages/Settings";
 import Leaderboard from "@/pages/Leaderboard";
 import Progress from "@/pages/Progress";
 import Developer from "@/pages/Developer";
@@ -46,9 +48,11 @@ function AppRoutes() {
       <Route path="/lessons" element={<ProtectedRoute><Lessons /></ProtectedRoute>} />
       <Route path="/lessons/:id" element={<ProtectedRoute><LessonDetail /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+      <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/developer" element={<ProtectedRoute><Developer /></ProtectedRoute>} />
       <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
       <Route path="/progress" element={<ProtectedRoute><Progress /></ProtectedRoute>} />
+      <Route path="/:username" element={<PublicProfile />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

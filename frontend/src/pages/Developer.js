@@ -4,6 +4,11 @@ import { developerAPI } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
+function calculateLevelFromXp(xp) {
+  if (xp <= 0) return 1;
+  return Math.floor(Math.sqrt(xp / 100)) + 1;
+}
+
 function UserRow({ user, onSave, onDelete }) {
   const [form, setForm] = useState({
     username: user.username || "",
@@ -31,7 +36,17 @@ function UserRow({ user, onSave, onDelete }) {
 
   const setNumber = (key, value) => {
     const parsed = Number(value);
-    setForm((f) => ({ ...f, [key]: Number.isFinite(parsed) ? parsed : 0 }));
+    const nextValue = Number.isFinite(parsed) ? parsed : 0;
+    setForm((f) => {
+      if (key === "xp") {
+        return {
+          ...f,
+          xp: nextValue,
+          level: calculateLevelFromXp(nextValue),
+        };
+      }
+      return { ...f, [key]: nextValue };
+    });
   };
 
   const save = async () => {

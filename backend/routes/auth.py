@@ -22,14 +22,16 @@ from utils import (
     get_current_user,
     get_jwt_secret,
     hash_password,
+    normalize_username,
     serialize_user,
     set_auth_cookie,
+    validate_username,
     verify_password,
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-PASSWORD_RE = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{10,128}$")
+PASSWORD_RE = re.compile(r"^.{6,128}$")
 RESET_CODE_WINDOW_MINUTES = 15
 VERIFY_CODE_WINDOW_MINUTES = 15
 
@@ -61,7 +63,7 @@ def _validate_password(password: str) -> None:
     if not PASSWORD_RE.match(password or ""):
         raise HTTPException(
             status_code=400,
-            detail="Password must be 10+ characters and include uppercase, lowercase, and a number.",
+            detail="Password must be between 6 and 128 characters.",
         )
 
 
@@ -131,15 +133,14 @@ async def register(data: UserCreate, request: Request):
     _validate_password(data.password)
 
     email = data.email.lower().strip()
-    username = data.username.strip()
-    if not username:
-        raise HTTPException(status_code=400, detail="Username is required")
+    username = validate_username(data.username)
+    username_normalized = normalize_username(username)
 
     existing = await db.users.find_one({"email": email})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    existing_username = await db.users.find_one({"username": username})
+    existing_username = await db.users.find_one({"username_normalized": username_normalized})
     if existing_username:
         raise HTTPException(status_code=400, detail="Username already taken")
 
@@ -151,7 +152,9 @@ async def register(data: UserCreate, request: Request):
         "email": email,
         "password_hash": hash_password(data.password),
         "username": username,
+        "username_normalized": username_normalized,
         "avatar": "default",
+        "bio": "",
         "xp": 0,
         "level": 1,
         "streak": 1,

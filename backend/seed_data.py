@@ -4,6 +4,10 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+from pymongo import UpdateOne
+
+from utils import normalize_username
+
 
 CURRICULUM_PATH = Path(__file__).parent / "content" / "curriculum.json"
 
@@ -14,12 +18,12 @@ def load_curriculum() -> dict:
 
 
 async def _sync_collection(collection, items, key="id"):
-    for item in items:
-        await collection.update_one(
-            {key: item[key]},
-            {"$setOnInsert": {**item}},
-            upsert=True,
-        )
+    operations = [
+        UpdateOne({key: item[key]}, {"$setOnInsert": {**item}}, upsert=True)
+        for item in items
+    ]
+    if operations:
+        await collection.bulk_write(operations, ordered=False)
 
 
 async def seed_database(db):
@@ -35,6 +39,7 @@ async def seed_database(db):
     # Create indexes
     await db.users.create_index("email", unique=True)
     await db.users.create_index("id", unique=True)
+    await db.users.create_index("username_normalized", unique=True)
     await db.users.create_index([("xp", -1)])
     await db.lessons.create_index("id", unique=True)
     await db.lessons.create_index("order_index")
@@ -48,6 +53,26 @@ async def seed_database(db):
     await db.password_resets.create_index("email", unique=True)
     await db.auth_rate_limits.create_index("key", unique=True)
     await db.auth_rate_limits.create_index("expires_at", expireAfterSeconds=0)
+    await db.friend_requests.create_index([("from_user_id", 1), ("to_user_id", 1)], unique=True)
+    await db.friend_requests.create_index("to_user_id")
+    await db.friend_requests.create_index("from_user_id")
+    await db.friendships.create_index([("user_id", 1), ("friend_user_id", 1)], unique=True)
+    await db.friendships.create_index("friend_user_id")
+
+    await db.users.update_many({"bio": {"$exists": False}}, {"$set": {"bio": ""}})
+    existing_users = await db.users.find(
+        {"username": {"$exists": True}},
+        {"_id": 0, "id": 1, "username": 1, "username_normalized": 1},
+    ).to_list(2000)
+    normalization_ops = []
+    for candidate in existing_users:
+        desired = normalize_username(candidate.get("username", ""))
+        if desired and candidate.get("username_normalized") != desired:
+            normalization_ops.append(
+                UpdateOne({"id": candidate["id"]}, {"$set": {"username_normalized": desired}})
+            )
+    if normalization_ops:
+        await db.users.bulk_write(normalization_ops, ordered=False)
 
     # Seed admin user
     from utils import hash_password
@@ -62,7 +87,9 @@ async def seed_database(db):
             "email": admin_email,
             "password_hash": hash_password(admin_password),
             "username": "Admin",
+            "username_normalized": normalize_username("Admin"),
             "avatar": "default",
+            "bio": "",
             "xp": 500,
             "level": 3,
             "streak": 5,
@@ -79,5 +106,10 @@ async def seed_database(db):
     else:
         await db.users.update_one(
             {"email": admin_email},
-            {"$set": {"email_verified": True, "role": "admin"}},
+            {"$set": {
+                "email_verified": True,
+                "role": "admin",
+                "username_normalized": normalize_username(admin_exists.get("username", "Admin")),
+                "bio": admin_exists.get("bio", ""),
+            }},
         )

@@ -18,6 +18,7 @@ class UserResponse(BaseModel):
     email: str
     username: str
     avatar: str = "default"
+    bio: str = ""
     xp: int = 0
     level: int = 1
     streak: int = 0
@@ -87,6 +88,11 @@ class CodeResponse(BaseModel):
     success: bool
     error: Optional[str] = None
     expected_output: Optional[str] = None
+    validation_message: Optional[str] = None
+    lesson_completed: bool = False
+    xp_earned: int = 0
+    new_level: Optional[int] = None
+    new_badges: List[str] = []
 
 
 class AiTutorRequest(BaseModel):
@@ -103,6 +109,30 @@ class AiTutorResponse(BaseModel):
 
 class ProfileUpdate(BaseModel):
     username: Optional[str] = None
+    bio: Optional[str] = None
+
+
+class PublicUserResponse(BaseModel):
+    id: str
+    username: str
+    avatar: str = "default"
+    bio: str = ""
+    xp: int = 0
+    level: int = 1
+    streak: int = 0
+    badges: List[str] = []
+    lessons_completed: int = 0
+    daily_completed: int = 0
+    perfect_quizzes: int = 0
+    created_at: str
+    is_me: bool = False
+    is_friend: bool = False
+    incoming_request: bool = False
+    outgoing_request: bool = False
+
+
+class FriendRequestCreate(BaseModel):
+    username: str
 
 
 class AdminUserUpdate(BaseModel):

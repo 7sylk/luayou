@@ -1,5 +1,6 @@
 import math
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -9,10 +10,80 @@ from fastapi import HTTPException, Request, Response
 
 
 AUTH_COOKIE_NAME = "luayou_session"
+USERNAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_.]{2,23}$")
+USERNAME_RESERVED = {
+    "dashboard",
+    "lessons",
+    "leaderboard",
+    "profile",
+    "settings",
+    "developer",
+    "login",
+    "signup",
+    "register",
+    "admin",
+    "api",
+    "progress",
+}
+USERNAME_BLOCKLIST = {
+    "admin",
+    "asshole",
+    "bastard",
+    "bitch",
+    "cock",
+    "cunt",
+    "damn",
+    "dick",
+    "fag",
+    "fuck",
+    "hitler",
+    "motherfucker",
+    "nazi",
+    "nigger",
+    "penis",
+    "porn",
+    "pussy",
+    "rape",
+    "retard",
+    "sex",
+    "shit",
+    "slut",
+    "suicide",
+    "whore",
+}
 
 
 def get_jwt_secret():
     return os.environ["JWT_SECRET"]
+
+
+def normalize_username(username: str) -> str:
+    return (username or "").strip().lower()
+
+
+def validate_username(username: str) -> str:
+    cleaned = (username or "").strip()
+    normalized = normalize_username(cleaned)
+
+    if not cleaned:
+        raise HTTPException(status_code=400, detail="Username is required")
+    if " " in cleaned:
+        raise HTTPException(status_code=400, detail="Username cannot contain spaces")
+    if len(cleaned) < 3:
+        raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
+    if len(cleaned) > 24:
+        raise HTTPException(status_code=400, detail="Username must be 24 characters or fewer")
+    if not USERNAME_RE.match(cleaned):
+        raise HTTPException(
+            status_code=400,
+            detail="Username must start with a letter and use only letters, numbers, underscores, or periods.",
+        )
+    if normalized in USERNAME_RESERVED:
+        raise HTTPException(status_code=400, detail="That username is reserved")
+    if any(blocked in normalized for blocked in USERNAME_BLOCKLIST):
+        raise HTTPException(status_code=400, detail="Please choose a different username")
+
+    return cleaned
 
 
 def hash_password(password: str) -> str:
@@ -108,6 +179,7 @@ def serialize_user(user: dict, request: Optional[Request] = None) -> dict:
     sanitized = {k: v for k, v in user.items() if k != "password_hash"}
     sanitized["avatar"] = absolutize_avatar(request, sanitized.get("avatar", "default"))
     sanitized["role"] = sanitized.get("role", "user")
+    sanitized["bio"] = sanitized.get("bio", "")
     return sanitized
 
 

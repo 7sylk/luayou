@@ -23,6 +23,7 @@ export default function LessonDetail() {
   const [completed, setCompleted] = useState(false);
   const [justCompleted, setJustCompleted] = useState(false);
   const [challengePassed, setChallengePassed] = useState(false);
+  const [validationMessage, setValidationMessage] = useState("");
   const [activeTab, setActiveTab] = useState("lesson");
   const [mobileView, setMobileView] = useState("lesson"); // lesson | editor
   const [totalLessons, setTotalLessons] = useState(1);
@@ -35,8 +36,14 @@ export default function LessonDetail() {
       setCompleted(res.data.completed);
       setChallengePassed(false);
       setJustCompleted(false);
+      setValidationMessage("");
       setLoading(false);
-    } catch {
+    } catch (error) {
+      const redirectLessonId = error.response?.data?.detail?.redirect_lesson_id;
+      if (redirectLessonId) {
+        navigate(`/lessons/${redirectLessonId}`, { replace: true });
+        return;
+      }
       navigate("/lessons");
     }
   }, [id, navigate]);
@@ -48,27 +55,6 @@ export default function LessonDetail() {
       .then((res) => setTotalLessons(Math.max(1, res.data?.length || 1)))
       .catch(() => {});
   }, []);
-
-  const handleComplete = async () => {
-    if (!challengePassed) {
-      toast.error("Pass the code challenge first.");
-      return;
-    }
-    try {
-      const res = await lessonsAPI.complete(id);
-      if (res.data.xp_earned > 0) {
-        toast.success(`+${res.data.xp_earned} XP! Lesson completed.`);
-        if (res.data.new_badges?.length > 0) {
-          toast.success(`New badge: ${res.data.new_badges.join(", ")}`);
-        }
-      }
-      setCompleted(true);
-      setJustCompleted(true);
-      await refreshUser();
-    } catch (e) {
-      toast.error(e.response?.data?.detail || "Error");
-    }
-  };
 
   if (loading || !lesson) {
     return (
@@ -82,7 +68,6 @@ export default function LessonDetail() {
   }
 
   const lessonNum = lesson.order_index;
-  const prevId = lessonNum > 1 ? `lesson-${String(lessonNum - 1).padStart(2, "0")}` : null;
   const nextId = lessonNum < totalLessons ? `lesson-${String(lessonNum + 1).padStart(2, "0")}` : null;
   const isLastLesson = lessonNum >= totalLessons;
 
@@ -125,29 +110,7 @@ export default function LessonDetail() {
           </div>
 
           <div className="flex items-center gap-2">
-            {prevId && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="rounded-none font-mono text-xs text-white/30 hover:text-white"
-                onClick={() => navigate(`/lessons/${prevId}`)}
-                data-testid="prev-lesson-btn"
-              >
-                <ArrowLeft size={12} />
-              </Button>
-            )}
-            <span className="font-mono text-xs text-white/20">{lessonNum}/{totalLessons}</span>
-            {nextId && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="rounded-none font-mono text-xs text-white/30 hover:text-white"
-                onClick={() => navigate(`/lessons/${nextId}`)}
-                data-testid="next-lesson-btn"
-              >
-                <ArrowRight size={12} />
-              </Button>
-            )}
+            <span className="font-mono text-xs text-white/20">Lesson {lessonNum}</span>
           </div>
         </div>
 
@@ -253,29 +216,23 @@ export default function LessonDetail() {
                         Open Editor
                       </Button>
 
-                      {challengePassed ? (
+                      <div>
                         <Button
-                          className="block bg-white text-black hover:bg-neutral-200 font-mono text-xs uppercase tracking-wider rounded-none"
-                          onClick={handleComplete}
+                          className="bg-white/10 text-white/30 font-mono text-xs uppercase tracking-wider rounded-none cursor-not-allowed"
+                          disabled
                           data-testid="mark-complete-btn"
                         >
-                          <Check size={12} className="mr-1 inline" />
-                          Mark as complete (+{lesson.xp_reward} XP)
+                          Complete challenge to pass
                         </Button>
-                      ) : (
-                        <div>
-                          <Button
-                            className="bg-white/10 text-white/30 font-mono text-xs uppercase tracking-wider rounded-none cursor-not-allowed"
-                            disabled
-                            data-testid="mark-complete-btn"
-                          >
-                            Pass the challenge to complete
-                          </Button>
-                          <p className="font-mono text-xs text-white/20 mt-2">
-                            Run your code until output matches
+                        <p className="font-mono text-xs text-white/20 mt-2">
+                          Output and solution structure both need to pass
+                        </p>
+                        {validationMessage && (
+                          <p className="font-mono text-xs text-white/35 mt-2">
+                            {validationMessage}
                           </p>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -299,14 +256,29 @@ export default function LessonDetail() {
               lessonId={id}
               starterCode={lesson.challenge_starter_code}
               expectedOutput={lesson.challenge_expected_output}
-              onOutputChange={(output, error) => {
+              onOutputChange={(output, error, result) => {
                 setCodeOutput(output);
                 setCodeError(error || "");
+                setValidationMessage(result?.validation_message || "");
               }}
               onCodeChange={setCurrentCode}
-              onSuccess={() => {
+              onSuccess={async (result) => {
                 setChallengePassed(true);
-                setMobileView("lesson"); // switch back so they see the complete button
+                setMobileView("lesson");
+                if (result?.lesson_completed) {
+                  setCompleted(true);
+                  setJustCompleted(true);
+                  setValidationMessage("");
+                  if (result.xp_earned > 0) {
+                    toast.success(`+${result.xp_earned} XP! Lesson completed.`);
+                  } else {
+                    toast.success("Lesson already completed.");
+                  }
+                  if (result?.new_badges?.length > 0) {
+                    toast.success(`New badge: ${result.new_badges.join(", ")}`);
+                  }
+                  await refreshUser();
+                }
               }}
             />
           </div>
