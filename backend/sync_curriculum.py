@@ -24,6 +24,13 @@ async def sync_collection(collection, items, overwrite=False, key="id"):
             )
 
 
+async def prune_collection(collection, items, key="id"):
+    valid_keys = [item[key] for item in items if item.get(key)]
+    if not valid_keys:
+        return
+    await collection.delete_many({key: {"$nin": valid_keys}})
+
+
 async def main():
     parser = argparse.ArgumentParser(description="Sync curriculum content into MongoDB.")
     parser.add_argument(
@@ -49,6 +56,15 @@ async def main():
         db.daily_templates,
         curriculum.get("daily_templates", []),
         overwrite=overwrite,
+    )
+    await prune_collection(db.lessons, curriculum.get("lessons", []))
+    await prune_collection(db.quizzes, curriculum.get("quizzes", []))
+    await prune_collection(db.daily_templates, curriculum.get("daily_templates", []))
+    await db.user_progress.delete_many(
+        {"lesson_id": {"$nin": [lesson["id"] for lesson in curriculum.get("lessons", [])]}}
+    )
+    await db.user_quiz_results.delete_many(
+        {"quiz_id": {"$nin": [quiz["id"] for quiz in curriculum.get("quizzes", [])]}}
     )
 
     print(f"Curriculum sync complete in mode: {args.mode}")

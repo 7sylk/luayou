@@ -44,6 +44,7 @@ class LessonBrief(BaseModel):
     order_index: int
     xp_reward: int
     completed: bool = False
+    mastered: bool = False
     locked: bool = False
 
 
@@ -59,6 +60,7 @@ class LessonFull(BaseModel):
     order_index: int
     xp_reward: int
     completed: bool = False
+    mastered: bool = False
 
 
 class QuizSubmission(BaseModel):
@@ -93,18 +95,6 @@ class CodeResponse(BaseModel):
     xp_earned: int = 0
     new_level: Optional[int] = None
     new_badges: List[str] = []
-
-
-class AiTutorRequest(BaseModel):
-    code: str
-    error_output: Optional[str] = ""
-    mode: str = "hint"
-    lesson_id: Optional[str] = None
-
-
-class AiTutorResponse(BaseModel):
-    response: str
-    mode: str
 
 
 class ProfileUpdate(BaseModel):

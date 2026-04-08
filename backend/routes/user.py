@@ -395,6 +395,14 @@ async def get_stats(request: Request):
     progress = await db.user_progress.find(
         {"user_id": user["id"], "completed": True}, {"_id": 0}
     ).to_list(200)
+    quizzes = await db.quizzes.find({}, {"_id": 0, "id": 1, "lesson_id": 1}).to_list(200)
+    quiz_ids = [quiz["id"] for quiz in quizzes]
+    quiz_results = await db.user_quiz_results.find(
+        {"user_id": user["id"], "quiz_id": {"$in": quiz_ids}}, {"_id": 0, "quiz_id": 1}
+    ).to_list(200)
+    mastered_lesson_ids = {
+        quiz["lesson_id"] for quiz in quizzes if quiz["id"] in {item["quiz_id"] for item in quiz_results}
+    }
 
     return {
         "xp": user.get("xp", 0),
@@ -406,6 +414,7 @@ async def get_stats(request: Request):
         "perfect_quizzes": user.get("perfect_quizzes", 0),
         "xp_for_next_level": xp_for_next_level(user.get("xp", 0)),
         "completed_lesson_ids": [p["lesson_id"] for p in progress],
+        "mastered_lesson_ids": list(mastered_lesson_ids),
     }
 
 
@@ -434,8 +443,20 @@ async def get_progress(request: Request):
                 "order_index": lesson["order_index"],
                 "xp_reward": lesson["xp_reward"],
                 "completed": lesson["id"] in completed_ids,
+                "mastered": False,
             }
         )
+
+    quizzes = await db.quizzes.find({}, {"_id": 0, "id": 1, "lesson_id": 1}).to_list(200)
+    quiz_ids = [quiz["id"] for quiz in quizzes]
+    quiz_results = await db.user_quiz_results.find(
+        {"user_id": user["id"], "quiz_id": {"$in": quiz_ids}}, {"_id": 0, "quiz_id": 1}
+    ).to_list(200)
+    mastered_lesson_ids = {
+        quiz["lesson_id"] for quiz in quizzes if quiz["id"] in {item["quiz_id"] for item in quiz_results}
+    }
+    for lesson in lesson_map:
+        lesson["mastered"] = lesson["id"] in mastered_lesson_ids
 
     beginner = [l for l in lesson_map if l["difficulty"] == "beginner"]
     intermediate = [l for l in lesson_map if l["difficulty"] == "intermediate"]

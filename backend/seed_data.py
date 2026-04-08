@@ -26,6 +26,13 @@ async def _sync_collection(collection, items, key="id"):
         await collection.bulk_write(operations, ordered=False)
 
 
+async def _prune_collection(collection, items, key="id"):
+    valid_keys = [item[key] for item in items if item.get(key)]
+    if not valid_keys:
+        return
+    await collection.delete_many({key: {"$nin": valid_keys}})
+
+
 async def seed_database(db):
     curriculum = load_curriculum()
     lessons = curriculum.get("lessons", [])
@@ -35,6 +42,11 @@ async def seed_database(db):
     await _sync_collection(db.lessons, lessons)
     await _sync_collection(db.quizzes, quizzes)
     await _sync_collection(db.daily_templates, daily_templates)
+    await _prune_collection(db.lessons, lessons)
+    await _prune_collection(db.quizzes, quizzes)
+    await _prune_collection(db.daily_templates, daily_templates)
+    await db.user_progress.delete_many({"lesson_id": {"$nin": [lesson["id"] for lesson in lessons]}})
+    await db.user_quiz_results.delete_many({"quiz_id": {"$nin": [quiz["id"] for quiz in quizzes]}})
 
     # Create indexes
     await db.users.create_index("email", unique=True)

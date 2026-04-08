@@ -71,6 +71,7 @@ export default function Lessons() {
           selectedLessonId={selectedLessonId}
           onSelectLesson={(lesson) => setSelectedLessonId(lesson.id)}
           onStartLesson={(lesson) => navigate(`/lessons/${lesson.id}`)}
+          onStartMastery={(lesson) => navigate(`/lessons/${lesson.id}?mode=mastery`)}
         />
       </main>
     </div>

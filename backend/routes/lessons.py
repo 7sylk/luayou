@@ -55,14 +55,23 @@ async def _get_lesson_progress_state(user_id: str):
         {"user_id": user_id}, {"_id": 0}
     ).to_list(200)
     completed_ids = {p["lesson_id"] for p in progress if p.get("completed")}
+    quizzes = await db.quizzes.find({}, {"_id": 0, "id": 1, "lesson_id": 1}).to_list(200)
+    quiz_ids = [quiz["id"] for quiz in quizzes]
+    quiz_results = await db.user_quiz_results.find(
+        {"user_id": user_id, "quiz_id": {"$in": quiz_ids}}, {"_id": 0, "quiz_id": 1}
+    ).to_list(200)
+    quiz_result_ids = {item["quiz_id"] for item in quiz_results}
+    mastered_ids = {
+        quiz["lesson_id"] for quiz in quizzes if quiz["id"] in quiz_result_ids
+    }
     first_incomplete = next((lesson for lesson in lessons if lesson["id"] not in completed_ids), None)
-    return lessons, completed_ids, first_incomplete
+    return lessons, completed_ids, mastered_ids, first_incomplete
 
 
 @router.get("")
 async def list_lessons(request: Request):
     user = await get_current_user(request, db)
-    lessons, completed_ids, _ = await _get_lesson_progress_state(user["id"])
+    lessons, completed_ids, mastered_ids, _ = await _get_lesson_progress_state(user["id"])
 
     result = []
     for i, lesson in enumerate(lessons):
@@ -81,6 +90,7 @@ async def list_lessons(request: Request):
                 order_index=lesson["order_index"],
                 xp_reward=lesson["xp_reward"],
                 completed=completed,
+                mastered=lesson["id"] in mastered_ids,
                 locked=locked,
             )
         )
@@ -91,7 +101,7 @@ async def list_lessons(request: Request):
 @router.get("/{lesson_id}")
 async def get_lesson(lesson_id: str, request: Request):
     user = await get_current_user(request, db)
-    lessons, completed_ids, first_incomplete = await _get_lesson_progress_state(user["id"])
+    lessons, completed_ids, mastered_ids, first_incomplete = await _get_lesson_progress_state(user["id"])
     lesson = next((candidate for candidate in lessons if candidate["id"] == lesson_id), None)
     if not lesson:
         raise HTTPException(status_code=404, detail="Lesson not found")
@@ -106,7 +116,7 @@ async def get_lesson(lesson_id: str, request: Request):
             },
         )
 
-    return LessonFull(**lesson, completed=completed)
+    return LessonFull(**lesson, completed=completed, mastered=lesson_id in mastered_ids)
 
 
 @router.post("/{lesson_id}/complete")

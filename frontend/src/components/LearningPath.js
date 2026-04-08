@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowRight, BookOpen, CaretLeft, CaretRight, Check, Lock } from "@phosphor-icons/react";
+import { ArrowRight, BookOpen, CaretLeft, CaretRight, Check, Lock, Sparkle } from "@phosphor-icons/react";
 
 const UNIT_META = [
   { title: "Unit 1", label: "Foundations" },
@@ -33,7 +33,7 @@ function chunkLessons(lessons) {
   });
 }
 
-export default function LearningPath({ lessons, onStartLesson }) {
+export default function LearningPath({ lessons, onStartLesson, onStartMastery }) {
   const units = useMemo(() => chunkLessons(lessons), [lessons]);
   const initialUnitIndex = Math.max(0, units.findIndex((unit) => unit.unlocked && !unit.complete));
   const [unitIndex, setUnitIndex] = useState(initialUnitIndex === -1 ? 0 : initialUnitIndex);
@@ -136,7 +136,9 @@ export default function LearningPath({ lessons, onStartLesson }) {
             <div className="space-y-6">
               {visibleLessons.map((lesson, idx) => {
                 const isSelected = selectedLesson?.id === lesson.id;
-                const bubbleClasses = lesson.completed
+                const bubbleClasses = lesson.mastered
+                  ? "border-[#8b6b24] bg-[#c7a34b] text-black"
+                  : lesson.completed
                   ? "border-white bg-white text-black"
                   : lesson.locked
                   ? "border-white/10 bg-transparent text-white/20"
@@ -159,7 +161,9 @@ export default function LearningPath({ lessons, onStartLesson }) {
                       }`}
                       data-testid={`path-bubble-${lesson.id}`}
                     >
-                      {lesson.completed ? (
+                      {lesson.mastered ? (
+                        <Sparkle size={26} weight="fill" />
+                      ) : lesson.completed ? (
                         <Check size={28} weight="bold" />
                       ) : lesson.locked ? (
                         <Lock size={24} />
@@ -207,20 +211,40 @@ export default function LearningPath({ lessons, onStartLesson }) {
                 <span className="border border-white/10 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-white/45">
                   +{selectedLesson.xp_reward} XP
                 </span>
+                {selectedLesson.mastered && (
+                  <span className="border border-[#8b6b24]/50 bg-[#c7a34b]/10 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-[#d9bb70]">
+                    Mastered
+                  </span>
+                )}
               </div>
-              <button
-                type="button"
-                disabled={selectedLesson.locked}
-                onClick={() => !selectedLesson.locked && onStartLesson(selectedLesson)}
-                className={`mt-6 w-full border px-4 py-3 font-mono text-xs uppercase tracking-[0.2em] transition-colors ${
-                  selectedLesson.locked
-                    ? "cursor-not-allowed border-white/10 text-white/20"
-                    : "border-white/20 text-white/70 hover:border-white/35 hover:text-white"
-                }`}
-                data-testid={`start-lesson-${selectedLesson.id}`}
-              >
-                {selectedLesson.completed ? "Review lesson" : "Start lesson"}
-              </button>
+              <div className="mt-6 space-y-3">
+                <button
+                  type="button"
+                  disabled={selectedLesson.locked}
+                  onClick={() => !selectedLesson.locked && onStartLesson(selectedLesson)}
+                  className={`w-full border px-4 py-3 font-mono text-xs uppercase tracking-[0.2em] transition-colors ${
+                    selectedLesson.locked
+                      ? "cursor-not-allowed border-white/10 text-white/20"
+                      : "border-white/20 text-white/70 hover:border-white/35 hover:text-white"
+                  }`}
+                  data-testid={`start-lesson-${selectedLesson.id}`}
+                >
+                  {selectedLesson.completed ? "Review lesson" : "Start lesson"}
+                </button>
+                {selectedLesson.completed && (
+                  <button
+                    type="button"
+                    onClick={() => onStartMastery?.(selectedLesson)}
+                    className={`w-full border px-4 py-3 font-mono text-xs uppercase tracking-[0.2em] transition-colors ${
+                      selectedLesson.mastered
+                        ? "border-[#8b6b24]/50 text-[#d9bb70] hover:border-[#c7a34b] hover:text-[#f0d78b]"
+                        : "border-[#8b6b24]/40 text-[#c7a34b] hover:border-[#c7a34b] hover:text-[#f0d78b]"
+                    }`}
+                  >
+                    {selectedLesson.mastered ? "Review mastery" : "Start mastery"}
+                  </button>
+                )}
+              </div>
             </>
           ) : (
             <p className="font-mono text-sm text-white/35">Select a lesson bubble.</p>

@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-export default function Quiz({ lessonId }) {
+export default function Quiz({ lessonId, onCompleted }) {
   const { refreshUser } = useAuth();
   const [quiz, setQuiz] = useState(null);
   const [answers, setAnswers] = useState([]);
@@ -45,6 +45,7 @@ export default function Quiz({ lessonId }) {
         answers,
       });
       setResults(res.data);
+      onCompleted?.(res.data);
       if (res.data.xp_earned > 0) {
         toast.success(`+${res.data.xp_earned} XP from quiz!`);
       }

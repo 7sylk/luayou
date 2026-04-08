@@ -54,10 +54,6 @@ export const leaderboardAPI = {
   get: () => api.get("/leaderboard"),
 };
 
-export const aiAPI = {
-  tutor: (data) => api.post("/ai/tutor", data),
-};
-
 export const userAPI = {
   profile: () => api.get("/user/profile"),
   updateProfile: (data) => api.put("/user/profile", data),

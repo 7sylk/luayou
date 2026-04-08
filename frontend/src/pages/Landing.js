@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import AuthModal from "@/components/AuthModal";
-import { Terminal, Code, Trophy, Lightning, Brain, Target, Plus, Minus } from "@phosphor-icons/react";
+import { Terminal, Code, Trophy, Lightning, Target, Plus, Minus } from "@phosphor-icons/react";
 
 const FEATURES = [
   { icon: Code, title: "Interactive Editor", desc: "Write and run Lua code directly in your browser" },
   { icon: Lightning, title: "XP & Levels", desc: "Earn XP, level up, and unlock new content" },
-  { icon: Brain, title: "AI Tutor", desc: "Get intelligent hints and explanations powered by GPT" },
   { icon: Trophy, title: "Leaderboard", desc: "Compete globally and climb the rankings" },
   { icon: Target, title: "Daily Challenges", desc: "Fresh coding challenges every day" },
   { icon: Terminal, title: "15+ Lessons", desc: "Structured curriculum from beginner to advanced" },
@@ -91,7 +90,7 @@ export default function Landing() {
           </h1>
           <p className="text-base text-white/60 max-w-lg leading-relaxed mb-10 font-light">
             Master Lua programming through interactive lessons, coding challenges,
-            and AI-powered tutoring. Earn XP, unlock levels, and compete on the leaderboard.
+            and a progression system built around practice. Earn XP, unlock levels, and compete on the leaderboard.
           </p>
           <div className="flex gap-3">
             <Button

@@ -114,3 +114,5 @@ agenthub/agents/youtube/db/
 memory/test_credentials.md
 frontend/node_modules/.cache/
 android-sdk/frontend/node_modules/.cache/
+.expo/
+mobile/.expo/

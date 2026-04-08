@@ -20,7 +20,6 @@ from routes.lessons import router as lessons_router
 from routes.quiz import router as quiz_router
 from routes.daily import router as daily_router
 from routes.leaderboard import router as leaderboard_router
-from routes.ai_tutor import router as ai_tutor_router
 from routes.code import router as code_router
 from routes.user import router as user_router
 
@@ -65,6 +64,5 @@ app.include_router(lessons_router)
 app.include_router(quiz_router)
 app.include_router(daily_router)
 app.include_router(leaderboard_router)
-app.include_router(ai_tutor_router)
 app.include_router(code_router)
 app.include_router(user_router)
