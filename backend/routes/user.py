@@ -369,7 +369,8 @@ async def upload_avatar(data: dict, request: Request):
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
     previous_avatar = user.get("avatar", "default")
-    filename = f"{user['id']}.{extension}"
+    avatar_updated_at = datetime.now(timezone.utc).isoformat()
+    filename = f"{user['id']}-{uuid.uuid4().hex[:10]}.{extension}"
     target = (UPLOADS_DIR / filename).resolve()
     if target.parent != UPLOADS_DIR.resolve():
         raise HTTPException(status_code=400, detail="Invalid avatar path")
@@ -380,11 +381,17 @@ async def upload_avatar(data: dict, request: Request):
     if previous_avatar != avatar_path:
         _remove_existing_avatar(previous_avatar)
 
-    await db.users.update_one({"id": user["id"]}, {"$set": {"avatar": avatar_path}})
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"avatar": avatar_path, "avatar_updated_at": avatar_updated_at}},
+    )
 
     return {
         "message": "Avatar updated",
-        "avatar": serialize_user({"avatar": avatar_path}, request)["avatar"],
+        "avatar": serialize_user(
+            {"avatar": avatar_path, "avatar_updated_at": avatar_updated_at},
+            request,
+        )["avatar"],
     }
 
 

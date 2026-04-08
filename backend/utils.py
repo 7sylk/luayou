@@ -167,17 +167,32 @@ def get_client_ip(request: Request) -> str:
     return "unknown"
 
 
-def absolutize_avatar(request: Optional[Request], avatar: str) -> str:
-    if not avatar or avatar == "default" or "://" in avatar or not avatar.startswith("/"):
+def absolutize_avatar(request: Optional[Request], avatar: str, avatar_updated_at: Optional[str] = None) -> str:
+    if not avatar or avatar == "default":
         return avatar
-    if request is None:
+    if "://" in avatar:
+        absolute = avatar
+    elif not avatar.startswith("/"):
         return avatar
-    return str(request.base_url).rstrip("/") + avatar
+    elif request is None:
+        absolute = avatar
+    else:
+        absolute = str(request.base_url).rstrip("/") + avatar
+
+    if avatar_updated_at and "?v=" not in absolute:
+        separator = "&" if "?" in absolute else "?"
+        absolute = f"{absolute}{separator}v={avatar_updated_at}"
+
+    return absolute
 
 
 def serialize_user(user: dict, request: Optional[Request] = None) -> dict:
     sanitized = {k: v for k, v in user.items() if k != "password_hash"}
-    sanitized["avatar"] = absolutize_avatar(request, sanitized.get("avatar", "default"))
+    sanitized["avatar"] = absolutize_avatar(
+        request,
+        sanitized.get("avatar", "default"),
+        sanitized.get("avatar_updated_at"),
+    )
     sanitized["role"] = sanitized.get("role", "user")
     sanitized["bio"] = sanitized.get("bio", "")
     return sanitized
