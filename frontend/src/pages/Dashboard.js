@@ -134,6 +134,7 @@ export default function Dashboard() {
   const [lessons, setLessons] = useState([]);
   const [daily, setDaily] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [completing, setCompleting] = useState(false);
 
   useEffect(() => {
@@ -141,7 +142,10 @@ export default function Dashboard() {
       userAPI.stats().then((r) => setStats(r.data)).catch(() => {}),
       lessonsAPI.list().then((r) => setLessons(r.data)).catch(() => {}),
       dailyAPI.get().then((r) => setDaily(r.data)).catch(() => {}),
-    ]).finally(() => setLoading(false));
+    ])
+      .then(() => setError(""))
+      .catch((err) => setError(err?.response?.data?.detail || "Some dashboard data could not be loaded."))
+      .finally(() => setLoading(false));
   }, []);
 
   const xp = stats?.xp || user?.xp || 0;
@@ -197,6 +201,13 @@ export default function Dashboard() {
           </h1>
         </div>
 
+        {error ? (
+          <div className="mb-6 border border-white/10 bg-white/[0.02] px-5 py-4">
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-white/40">Notice</p>
+            <p className="mt-2 text-sm text-white/60">{error}</p>
+          </div>
+        ) : null}
+
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-white/10 mb-8 animate-fade-in stagger-1" data-testid="stats-grid">
           <div className="bg-background p-5">
             <p className="font-mono text-xs text-white/40 uppercase tracking-wider mb-1">XP</p>
@@ -242,7 +253,7 @@ export default function Dashboard() {
                 completing={completing}
               />
             ) : (
-              <div className="p-5 text-white/30 font-mono text-sm">No challenge today</div>
+              <div className="p-5 text-white/30 font-mono text-sm">Daily challenge unavailable right now</div>
             )}
           </div>
 
@@ -263,7 +274,7 @@ export default function Dashboard() {
               </Button>
             </div>
             <div>
-              {recentLessons.map((lesson) => (
+              {recentLessons.length ? recentLessons.map((lesson) => (
                 <button
                   key={lesson.id}
                   className="w-full text-left px-5 py-3 border-b border-white/5 hover:bg-white/[0.02] flex items-center justify-between group transition-colors"
@@ -281,7 +292,9 @@ export default function Dashboard() {
                   </div>
                   <span className="font-mono text-xs text-white/20">{lesson.xp_reward}xp</span>
                 </button>
-              ))}
+              )) : (
+                <div className="px-5 py-4 text-sm text-white/35">Lessons are not available right now.</div>
+              )}
             </div>
           </div>
         </div>

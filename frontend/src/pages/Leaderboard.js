@@ -34,6 +34,7 @@ export default function Leaderboard() {
   const { user } = useAuth();
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -47,8 +48,12 @@ export default function Leaderboard() {
       .then(([leaderboardRes, requestsRes]) => {
         setEntries(leaderboardRes.data);
         setRequests(requestsRes.data);
+        setError("");
       })
-      .catch(() => {})
+      .catch((err) => {
+        setEntries([]);
+        setError(formatApiError(err?.response?.data?.detail));
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -120,7 +125,12 @@ export default function Leaderboard() {
           </h1>
         </div>
 
-        {entries.length === 0 ? (
+        {error ? (
+          <div className="border border-white/10 bg-white/[0.02] p-8 text-center">
+            <p className="font-mono text-sm text-white/70">Leaderboard could not be loaded.</p>
+            <p className="mt-2 text-sm text-white/35">{error}</p>
+          </div>
+        ) : entries.length === 0 ? (
           <div className="border border-white/10 p-8 text-center font-mono text-sm text-white/30">
             No users yet. Be the first!
           </div>

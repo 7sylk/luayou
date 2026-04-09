@@ -1,17 +1,38 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import Screen from "../components/Screen";
 import SectionCard from "../components/SectionCard";
+import StateBlock from "../components/StateBlock";
+import UserAvatar from "../components/UserAvatar";
 import { Eyebrow, Title } from "../components/Type";
 import { colors, spacing } from "../theme";
-import { leaderboardAPI } from "../lib/api";
+import { formatApiError, leaderboardAPI } from "../lib/api";
 
 export default function LeaderboardScreen({ navigation }) {
   const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    leaderboardAPI.get().then((res) => setEntries(res.data || [])).catch(() => {});
+  const loadLeaderboard = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await leaderboardAPI.get();
+      setEntries(res.data || []);
+      setError("");
+    } catch (err) {
+      setEntries([]);
+      setError(formatApiError(err));
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadLeaderboard();
+    }, [loadLeaderboard])
+  );
 
   return (
     <Screen>
@@ -22,26 +43,45 @@ export default function LeaderboardScreen({ navigation }) {
         </View>
 
         <SectionCard style={{ padding: 0 }}>
-          {entries.map((entry, index) => (
-            <Pressable
-              key={entry.id || `${entry.username}-${index}`}
-              onPress={() => navigation.navigate("PublicProfile", { username: entry.username })}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: spacing.lg,
-                borderBottomWidth: index === entries.length - 1 ? 0 : 1,
-                borderBottomColor: colors.border
-              }}
-            >
-              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
-                <Text style={{ color: colors.faint, width: 28 }}>#{entry.rank}</Text>
-                <Text style={{ color: colors.text, fontWeight: "600" }}>{entry.username}</Text>
-              </View>
-              <Text style={{ color: colors.muted }}>{entry.xp} XP</Text>
-            </Pressable>
-          ))}
+          {loading ? (
+            <View style={{ padding: spacing.lg }}>
+              <StateBlock title="Loading leaderboard" description="Getting the latest rankings." compact />
+            </View>
+          ) : error ? (
+            <View style={{ padding: spacing.lg }}>
+              <StateBlock title="Leaderboard unavailable" description={error} compact />
+            </View>
+          ) : entries.length ? (
+            entries.map((entry, index) => (
+              <Pressable
+                key={entry.id || `${entry.username}-${index}`}
+                onPress={() => navigation.navigate("PublicProfile", { username: entry.username })}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: spacing.lg,
+                  borderBottomWidth: index === entries.length - 1 ? 0 : 1,
+                  borderBottomColor: colors.border
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+                  <Text style={{ color: colors.faint, width: 28 }}>#{entry.rank}</Text>
+                  <UserAvatar user={entry} size={40} />
+                  <View>
+                    <Text style={{ color: colors.text, fontWeight: "600" }}>{entry.username}</Text>
+                    <Text style={{ color: colors.muted, marginTop: 4 }}>
+                      Level {entry.level} | {entry.xp} XP
+                    </Text>
+                  </View>
+                </View>
+              </Pressable>
+            ))
+          ) : (
+            <View style={{ padding: spacing.lg }}>
+              <StateBlock title="No rankings yet" description="The leaderboard will appear once users start earning XP." compact />
+            </View>
+          )}
         </SectionCard>
       </ScrollView>
     </Screen>

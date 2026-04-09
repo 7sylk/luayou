@@ -3,19 +3,26 @@ import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import LearningPath from "@/components/LearningPath";
 import { LessonsSkeleton } from "@/components/Skeleton";
-import { lessonsAPI } from "@/lib/api";
+import { formatApiError, lessonsAPI } from "@/lib/api";
 
 export default function Lessons() {
   const [lessons, setLessons] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [selectedLessonId, setSelectedLessonId] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     lessonsAPI
       .list()
-      .then((r) => setLessons(r.data))
-      .catch(() => {})
+      .then((r) => {
+        setLessons(r.data);
+        setError("");
+      })
+      .catch((err) => {
+        setLessons([]);
+        setError(formatApiError(err?.response?.data?.detail));
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -66,13 +73,25 @@ export default function Lessons() {
           </div>
         </div>
 
-        <LearningPath
-          lessons={lessons}
-          selectedLessonId={selectedLessonId}
-          onSelectLesson={(lesson) => setSelectedLessonId(lesson.id)}
-          onStartLesson={(lesson) => navigate(`/lessons/${lesson.id}`)}
-          onStartMastery={(lesson) => navigate(`/lessons/${lesson.id}?mode=mastery`)}
-        />
+        {error ? (
+          <div className="border border-white/10 bg-white/[0.02] px-5 py-8 text-center">
+            <p className="font-mono text-sm text-white/70">Lessons could not be loaded.</p>
+            <p className="mt-2 text-sm text-white/35">{error}</p>
+          </div>
+        ) : lessons.length ? (
+          <LearningPath
+            lessons={lessons}
+            selectedLessonId={selectedLessonId}
+            onSelectLesson={(lesson) => setSelectedLessonId(lesson.id)}
+            onStartLesson={(lesson) => navigate(`/lessons/${lesson.id}`)}
+            onStartMastery={(lesson) => navigate(`/lessons/${lesson.id}?mode=mastery`)}
+          />
+        ) : (
+          <div className="border border-white/10 bg-white/[0.02] px-5 py-8 text-center">
+            <p className="font-mono text-sm text-white/70">No lessons are available yet.</p>
+            <p className="mt-2 text-sm text-white/35">Once the curriculum loads, your path will appear here.</p>
+          </div>
+        )}
       </main>
     </div>
   );

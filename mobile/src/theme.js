@@ -8,6 +8,9 @@ export const colors = {
   faint: "#5c5c5c",
   accent: "#ffffff",
   accentText: "#050505",
+  gold: "#c7a34b",
+  goldBorder: "#8b6b24",
+  goldTint: "#20180a",
   success: "#d6ffd6",
   danger: "#ffd7d7"
 };

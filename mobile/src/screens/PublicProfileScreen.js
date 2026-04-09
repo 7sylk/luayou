@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Image, ScrollView, Text, View } from "react-native";
+import { Alert, ScrollView, Text, View } from "react-native";
 import Screen from "../components/Screen";
 import SectionCard from "../components/SectionCard";
 import StatPill from "../components/StatPill";
 import PrimaryButton from "../components/PrimaryButton";
+import StateBlock from "../components/StateBlock";
+import UserAvatar from "../components/UserAvatar";
 import { Body, Eyebrow, Title } from "../components/Type";
 import { colors, spacing } from "../theme";
 import { formatApiError, userAPI } from "../lib/api";
@@ -17,8 +19,11 @@ export default function PublicProfileScreen({ route, navigation }) {
   const [profile, setProfile] = useState(null);
   const [requests, setRequests] = useState({ incoming: [], outgoing: [] });
   const [pending, setPending] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const [profileRes, requestsRes] = await Promise.all([
         userAPI.publicProfile(username),
@@ -26,12 +31,16 @@ export default function PublicProfileScreen({ route, navigation }) {
       ]);
       setProfile(profileRes.data);
       setRequests(requestsRes.data || { incoming: [], outgoing: [] });
-    } catch (error) {
-      if (error?.response?.status === 404) {
+      setError("");
+    } catch (err) {
+      if (err?.response?.status === 404) {
         navigation.goBack();
         return;
       }
       setProfile(null);
+      setError(formatApiError(err));
+    } finally {
+      setLoading(false);
     }
   }, [navigation, username]);
 
@@ -55,17 +64,25 @@ export default function PublicProfileScreen({ route, navigation }) {
         await userAPI.removeFriend(profile.username);
       }
       await load();
-    } catch (error) {
-      Alert.alert("Error", formatApiError(error));
+    } catch (err) {
+      Alert.alert("Error", formatApiError(err));
     } finally {
       setPending(false);
     }
   };
 
+  if (loading) {
+    return (
+      <Screen style={{ padding: spacing.lg, justifyContent: "center" }}>
+        <StateBlock title="Loading profile" description="Getting the latest profile information." />
+      </Screen>
+    );
+  }
+
   if (!profile) {
     return (
-      <Screen style={{ alignItems: "center", justifyContent: "center" }}>
-        <Text style={{ color: colors.muted }}>Loading profile...</Text>
+      <Screen style={{ padding: spacing.lg, justifyContent: "center" }}>
+        <StateBlock title="Profile unavailable" description={error || "This profile could not be loaded."} />
       </Screen>
     );
   }
@@ -87,7 +104,7 @@ export default function PublicProfileScreen({ route, navigation }) {
     }
     if (profile.outgoing_request) {
       return [
-        <PrimaryButton key="cancel" label="Cancel request" subtle onPress={() => runAction("remove")} disabled={pending} />
+        <PrimaryButton key="pending" label="Request sent" subtle disabled />
       ];
     }
     return [<PrimaryButton key="add" label="Add friend" onPress={() => runAction("add")} disabled={pending} />];
@@ -98,29 +115,7 @@ export default function PublicProfileScreen({ route, navigation }) {
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
         <SectionCard>
           <View style={{ flexDirection: "row", gap: spacing.md, alignItems: "center" }}>
-            {profile.avatar && profile.avatar !== "default" ? (
-              <Image
-                source={{ uri: profile.avatar }}
-                style={{ width: 72, height: 72, borderRadius: 36, borderWidth: 1, borderColor: colors.border }}
-              />
-            ) : (
-              <View
-                style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: 36,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  backgroundColor: colors.accent,
-                  alignItems: "center",
-                  justifyContent: "center"
-                }}
-              >
-                <Text style={{ color: colors.accentText, fontWeight: "700", fontSize: 24 }}>
-                  {profile.username?.charAt(0)?.toUpperCase() || "?"}
-                </Text>
-              </View>
-            )}
+            <UserAvatar user={profile} size={72} />
 
             <View style={{ flex: 1 }}>
               <Eyebrow>Profile</Eyebrow>

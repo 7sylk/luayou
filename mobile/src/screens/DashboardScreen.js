@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Alert, ScrollView, Text, TextInput, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import Screen from "../components/Screen";
 import SectionCard from "../components/SectionCard";
 import StatPill from "../components/StatPill";
 import PrimaryButton from "../components/PrimaryButton";
 import LuaRuntime from "../components/LuaRuntime";
+import StateBlock from "../components/StateBlock";
+import UserAvatar from "../components/UserAvatar";
 import { Body, Eyebrow, Title } from "../components/Type";
 import { colors, spacing } from "../theme";
 import { dailyAPI, formatApiError, lessonsAPI, userAPI } from "../lib/api";
@@ -47,7 +50,7 @@ function DailyChallengeCard({ daily, onComplete, completing, runtimeRef }) {
       <View style={{ gap: spacing.sm }}>
         <Text style={{ color: colors.text, fontWeight: "600" }}>{daily.title}</Text>
         <Body>{daily.description}</Body>
-        <Text style={{ color: colors.muted }}>Completed · +{daily.xp_reward} XP</Text>
+        <Text style={{ color: colors.muted }}>Completed | +{daily.xp_reward} XP</Text>
       </View>
     );
   }
@@ -118,13 +121,31 @@ export default function DashboardScreen({ navigation }) {
   const [completing, setCompleting] = useState(false);
   const runtimeRef = useRef(null);
 
-  useEffect(() => {
-    Promise.all([
-      userAPI.stats().then((res) => setStats(res.data)).catch(() => {}),
-      lessonsAPI.list().then((res) => setLessons(res.data || [])).catch(() => {}),
-      dailyAPI.get().then((res) => setDaily(res.data)).catch(() => {})
-    ]).finally(() => setLoading(false));
+  const loadDashboard = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [statsRes, lessonsRes, dailyRes] = await Promise.all([
+        userAPI.stats(),
+        lessonsAPI.list(),
+        dailyAPI.get()
+      ]);
+      setStats(statsRes.data);
+      setLessons(lessonsRes.data || []);
+      setDaily(dailyRes.data);
+    } catch {
+      setStats(null);
+      setLessons([]);
+      setDaily(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadDashboard();
+    }, [loadDashboard])
+  );
 
   const handleCompleteDaily = useCallback(async () => {
     if (completing) return;
@@ -145,8 +166,8 @@ export default function DashboardScreen({ navigation }) {
 
   if (loading) {
     return (
-      <Screen style={{ alignItems: "center", justifyContent: "center" }}>
-        <Text style={{ color: colors.muted }}>Loading dashboard...</Text>
+      <Screen style={{ padding: spacing.lg, justifyContent: "center" }}>
+        <StateBlock title="Loading dashboard" description="Pulling in your lessons, stats, and daily challenge." />
       </Screen>
     );
   }
@@ -155,26 +176,36 @@ export default function DashboardScreen({ navigation }) {
   const level = stats?.level || user?.level || 1;
   const streak = stats?.streak || user?.streak || 0;
   const completedCount = stats?.lessons_completed || 0;
+  const masteredCount = stats?.mastered_lesson_ids?.length || 0;
   const nextLevelXp = stats?.xp_for_next_level || level * level * 100;
   const previousLevelXp = (level - 1) * (level - 1) * 100;
   const progressPct = nextLevelXp > previousLevelXp
     ? Math.min(100, ((xp - previousLevelXp) / (nextLevelXp - previousLevelXp)) * 100)
     : 0;
+  const nextLesson = lessons.find((lesson) => !lesson.locked && !lesson.completed) || lessons.find((lesson) => !lesson.locked) || null;
 
   return (
     <Screen>
       <LuaRuntime ref={runtimeRef} />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
-        <View>
-          <Eyebrow>Dashboard</Eyebrow>
-          <Title style={{ marginTop: spacing.sm }}>Welcome back, {user?.username}</Title>
-        </View>
+        <SectionCard style={{ padding: spacing.xl }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+            <UserAvatar user={user} size={72} />
+            <View style={{ flex: 1 }}>
+              <Eyebrow>Dashboard</Eyebrow>
+              <Title style={{ marginTop: spacing.sm }}>Welcome back, {user?.username}</Title>
+              <Body style={{ marginTop: spacing.xs }}>
+                Keep moving through the path and come back for mastery when you want to lock lessons in.
+              </Body>
+            </View>
+          </View>
+        </SectionCard>
 
         <View style={{ flexDirection: "row", gap: spacing.sm, flexWrap: "wrap" }}>
           <StatPill label="XP" value={xp} />
           <StatPill label="Level" value={level} />
           <StatPill label="Streak" value={streak} />
-          <StatPill label="Lessons" value={completedCount} />
+          <StatPill label="Mastered" value={masteredCount} />
         </View>
 
         <SectionCard>
@@ -185,31 +216,63 @@ export default function DashboardScreen({ navigation }) {
           <View style={{ height: 8, backgroundColor: colors.border, marginTop: spacing.md }}>
             <View style={{ height: "100%", width: `${progressPct}%`, backgroundColor: colors.text }} />
           </View>
+          <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.md }}>
+            <PrimaryButton label="Open path" onPress={() => navigation.navigate("Learn")} style={{ flex: 1 }} />
+            {nextLesson ? (
+              <PrimaryButton
+                label={`Lesson ${nextLesson.order_index}`}
+                subtle
+                onPress={() => navigation.navigate("Lesson", { lessonId: nextLesson.id })}
+                style={{ flex: 1 }}
+              />
+            ) : null}
+          </View>
+        </SectionCard>
+
+        <SectionCard>
+          <Text style={{ color: colors.text, fontWeight: "600" }}>Today</Text>
+          <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.md, flexWrap: "wrap" }}>
+            <StatPill label="Completed" value={completedCount} />
+            <StatPill label="Daily" value={daily?.completed ? 1 : 0} />
+          </View>
         </SectionCard>
 
         <SectionCard>
           <Text style={{ color: colors.text, fontWeight: "600" }}>Daily challenge</Text>
           <View style={{ marginTop: spacing.md }}>
-            {daily ? <DailyChallengeCard daily={daily} onComplete={handleCompleteDaily} completing={completing} runtimeRef={runtimeRef} /> : <Body>No challenge today.</Body>}
+            {daily ? (
+              <DailyChallengeCard
+                daily={daily}
+                onComplete={handleCompleteDaily}
+                completing={completing}
+                runtimeRef={runtimeRef}
+              />
+            ) : (
+              <StateBlock title="No challenge yet" description="Your daily challenge did not load. Try again in a moment." compact />
+            )}
           </View>
         </SectionCard>
 
         <SectionCard>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }}>
-            <Text style={{ color: colors.text, fontWeight: "600" }}>Lessons</Text>
+            <Text style={{ color: colors.text, fontWeight: "600" }}>Continue learning</Text>
             <PrimaryButton label="Learn" subtle onPress={() => navigation.navigate("Learn")} />
           </View>
           <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
-            {lessons.slice(0, 5).map((lesson) => (
-              <PrimaryButton
-                key={lesson.id}
-                label={`${lesson.order_index}. ${lesson.title}`}
-                subtle
-                onPress={() => !lesson.locked && navigation.navigate("Lesson", { lessonId: lesson.id })}
-                disabled={lesson.locked}
-                style={{ alignItems: "flex-start" }}
-              />
-            ))}
+            {lessons.length ? (
+              lessons.slice(0, 5).map((lesson) => (
+                <PrimaryButton
+                  key={lesson.id}
+                  label={`${lesson.order_index}. ${lesson.title}`}
+                  subtle
+                  onPress={() => !lesson.locked && navigation.navigate("Lesson", { lessonId: lesson.id })}
+                  disabled={lesson.locked}
+                  style={{ alignItems: "flex-start" }}
+                />
+              ))
+            ) : (
+              <StateBlock title="No lessons loaded" description="The course list is not available right now." compact />
+            )}
           </View>
         </SectionCard>
       </ScrollView>

@@ -1,43 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import Screen from "../components/Screen";
 import SectionCard from "../components/SectionCard";
 import PrimaryButton from "../components/PrimaryButton";
+import UserAvatar from "../components/UserAvatar";
 import { Body, Eyebrow, Title } from "../components/Type";
 import { colors, spacing } from "../theme";
 import { formatApiError, userAPI } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-
-function Avatar({ user, avatarSrc }) {
-  if (avatarSrc) {
-    return (
-      <Image
-        source={{ uri: avatarSrc }}
-        style={{ width: 72, height: 72, borderRadius: 36, borderWidth: 1, borderColor: colors.border }}
-      />
-    );
-  }
-
-  return (
-    <View
-      style={{
-        width: 72,
-        height: 72,
-        borderRadius: 36,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.accent,
-        alignItems: "center",
-        justifyContent: "center"
-      }}
-    >
-      <Text style={{ color: colors.accentText, fontWeight: "700", fontSize: 24 }}>
-        {user?.username?.charAt(0)?.toUpperCase() || "?"}
-      </Text>
-    </View>
-  );
-}
 
 function RequestCard({ item, actionLabel, onAction, secondaryLabel, onSecondary }) {
   return (
@@ -171,7 +142,7 @@ export default function SettingsScreen({ navigation }) {
         <SectionCard>
           <View style={{ flexDirection: "row", gap: spacing.md, alignItems: "center" }}>
             <Pressable onPress={handleAvatarPick} disabled={uploadingAvatar}>
-              <Avatar user={user} avatarSrc={avatarSrc} />
+              <UserAvatar user={user} uri={avatarSrc} size={72} />
             </Pressable>
             <View style={{ flex: 1 }}>
               <Text style={{ color: colors.text, fontWeight: "600" }}>Profile photo</Text>

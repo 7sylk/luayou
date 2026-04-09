@@ -72,7 +72,7 @@ export const developerAPI = {
 };
 
 export function formatApiError(error) {
-  const detail = error?.response?.data?.detail;
+  const detail = error?.response?.data?.detail ?? error?.message ?? error;
   if (!detail) return "Something went wrong.";
   if (typeof detail === "string") return detail;
   if (typeof detail?.message === "string") return detail.message;

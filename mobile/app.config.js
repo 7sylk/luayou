@@ -12,6 +12,7 @@ module.exports = () => {
       version: "1.0.0",
       orientation: "portrait",
       userInterfaceStyle: "dark",
+      icon: "./assets/icon.png",
       splash: {
         backgroundColor: "#050505"
       },
@@ -22,6 +23,7 @@ module.exports = () => {
       android: {
         package: "com.luayou.app",
         adaptiveIcon: {
+          foregroundImage: "./assets/adaptive-icon.png",
           backgroundColor: "#050505"
         }
       },

@@ -167,6 +167,21 @@ def get_client_ip(request: Request) -> str:
     return "unknown"
 
 
+def get_public_base_url(request: Optional[Request]) -> Optional[str]:
+    if request is None:
+        return None
+
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip()
+    forwarded_host = request.headers.get("x-forwarded-host", "").split(",")[0].strip()
+    host = forwarded_host or request.headers.get("host", "").strip()
+
+    if host:
+        scheme = forwarded_proto or request.url.scheme or "https"
+        return f"{scheme}://{host}"
+
+    return str(request.base_url).rstrip("/")
+
+
 def absolutize_avatar(request: Optional[Request], avatar: str, avatar_updated_at: Optional[str] = None) -> str:
     if not avatar or avatar == "default":
         return avatar
@@ -177,7 +192,7 @@ def absolutize_avatar(request: Optional[Request], avatar: str, avatar_updated_at
     elif request is None:
         absolute = avatar
     else:
-        absolute = str(request.base_url).rstrip("/") + avatar
+        absolute = f"{get_public_base_url(request)}{avatar}"
 
     if avatar_updated_at and "?v=" not in absolute:
         separator = "&" if "?" in absolute else "?"

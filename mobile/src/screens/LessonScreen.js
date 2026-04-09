@@ -5,6 +5,7 @@ import Screen from "../components/Screen";
 import SectionCard from "../components/SectionCard";
 import PrimaryButton from "../components/PrimaryButton";
 import LuaRuntime from "../components/LuaRuntime";
+import StateBlock from "../components/StateBlock";
 import { Body, Eyebrow, Title } from "../components/Type";
 import { colors, spacing } from "../theme";
 import { codeAPI, formatApiError, lessonsAPI, quizAPI } from "../lib/api";
@@ -291,8 +292,8 @@ export default function LessonScreen({ route, navigation }) {
 
   if (loading || !lesson) {
     return (
-      <Screen style={{ alignItems: "center", justifyContent: "center" }}>
-        <Text style={{ color: colors.muted }}>Loading lesson...</Text>
+      <Screen style={{ padding: spacing.lg, justifyContent: "center" }}>
+        <StateBlock title="Loading lesson" description="Getting your lesson content, progress, and challenge ready." />
       </Screen>
     );
   }

@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import Screen from "../components/Screen";
 import SectionCard from "../components/SectionCard";
 import PrimaryButton from "../components/PrimaryButton";
+import StateBlock from "../components/StateBlock";
+import UserAvatar from "../components/UserAvatar";
 import { Body, Eyebrow, Title } from "../components/Type";
 import { colors, spacing } from "../theme";
 import { formatApiError, userAPI } from "../lib/api";
@@ -11,27 +14,11 @@ function PersonCard({ user, primaryLabel, onPrimary, secondaryLabel, onSecondary
   return (
     <View style={{ borderWidth: 1, borderColor: colors.border, padding: spacing.md, gap: spacing.md }}>
       <Pressable onPress={onOpen} style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
-        <View
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            overflow: "hidden",
-            borderWidth: 1,
-            borderColor: colors.border,
-            backgroundColor: colors.accent,
-            alignItems: "center",
-            justifyContent: "center"
-          }}
-        >
-          <Text style={{ color: colors.accentText, fontWeight: "700" }}>
-            {user.username?.charAt(0)?.toUpperCase() || "?"}
-          </Text>
-        </View>
+        <UserAvatar user={user} size={44} />
         <View style={{ flex: 1 }}>
           <Text style={{ color: colors.text, fontWeight: "600" }}>{user.username}</Text>
           <Text style={{ color: colors.muted, marginTop: 4 }}>
-            Level {user.level} · {user.xp} XP
+            Level {user.level} | {user.xp} XP
           </Text>
         </View>
       </Pressable>
@@ -51,8 +38,11 @@ export default function FriendsScreen({ navigation }) {
   const [requests, setRequests] = useState({ incoming: [], outgoing: [] });
   const [username, setUsername] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const [friendsRes, requestsRes] = await Promise.all([
         userAPI.friends(),
@@ -60,15 +50,21 @@ export default function FriendsScreen({ navigation }) {
       ]);
       setFriends(friendsRes.data || []);
       setRequests(requestsRes.data || { incoming: [], outgoing: [] });
-    } catch {
+      setError("");
+    } catch (err) {
       setFriends([]);
       setRequests({ incoming: [], outgoing: [] });
+      setError(formatApiError(err));
+    } finally {
+      setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   const sendRequest = async () => {
     if (!username.trim()) return;
@@ -146,7 +142,11 @@ export default function FriendsScreen({ navigation }) {
         <SectionCard>
           <Text style={{ color: colors.text, fontWeight: "600" }}>Incoming requests</Text>
           <View style={{ marginTop: spacing.md, gap: spacing.md }}>
-            {requests.incoming?.length ? (
+            {loading ? (
+              <StateBlock title="Loading requests" description="Checking your incoming requests." compact />
+            ) : error ? (
+              <StateBlock title="Requests unavailable" description={error} compact />
+            ) : requests.incoming?.length ? (
               requests.incoming.map((item) => (
                 <PersonCard
                   key={item.id}
@@ -167,7 +167,11 @@ export default function FriendsScreen({ navigation }) {
         <SectionCard>
           <Text style={{ color: colors.text, fontWeight: "600" }}>Outgoing requests</Text>
           <View style={{ marginTop: spacing.md, gap: spacing.md }}>
-            {requests.outgoing?.length ? (
+            {loading ? (
+              <StateBlock title="Loading requests" description="Checking your pending requests." compact />
+            ) : error ? (
+              <StateBlock title="Requests unavailable" description={error} compact />
+            ) : requests.outgoing?.length ? (
               requests.outgoing.map((item) => (
                 <PersonCard
                   key={item.id}
@@ -186,7 +190,11 @@ export default function FriendsScreen({ navigation }) {
         <SectionCard>
           <Text style={{ color: colors.text, fontWeight: "600" }}>Your friends</Text>
           <View style={{ marginTop: spacing.md, gap: spacing.md }}>
-            {friends.length ? (
+            {loading ? (
+              <StateBlock title="Loading friends" description="Pulling down your latest friend list." compact />
+            ) : error ? (
+              <StateBlock title="Friends unavailable" description={error} compact />
+            ) : friends.length ? (
               friends.map((friend) => (
                 <PersonCard
                   key={friend.id}
